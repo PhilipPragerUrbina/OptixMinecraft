@@ -13,6 +13,6 @@ Unzip, put folder in Optix samples directory
 
 Add to the sample directories cmakelists.txt 
 
-Generate CMAKEfor optix
+Generate CMAKE for optix
 
 Put a 32*16 texture atlas in the debug directory called game.ppm
