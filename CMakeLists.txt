@@ -10,3 +10,4 @@ OPTIX_add_sample_executable( minecraft3 target_name
 target_link_libraries( ${target_name}
   ${CUDA_LIBRARIES}
   )
+
