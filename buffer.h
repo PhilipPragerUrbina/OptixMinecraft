@@ -23,6 +23,7 @@ struct Params
     float3 playerpos;
     float3* verts;
     //uv data
+
     float4* uvs;
    
     cudaTextureObject_t          tex;
