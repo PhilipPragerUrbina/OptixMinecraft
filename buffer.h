@@ -8,6 +8,8 @@ enum RayType
 
 struct Params
 {
+
+
     uchar4*                image;
     unsigned int           image_width;
     unsigned int           image_height;
@@ -20,7 +22,7 @@ struct Params
   
     float3 playerpos;
     float3* verts;
-
+    //uv data
     float4* uvs;
    
     cudaTextureObject_t          tex;
