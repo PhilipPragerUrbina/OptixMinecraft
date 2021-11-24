@@ -12,7 +12,7 @@ extern "C" {
     __constant__ Params params;
 }
 
-
+# define M_PI           3.14159265358979323846
 
 //------------------------------------------------------------------------------
 //
@@ -129,6 +129,8 @@ static __forceinline__ __device__ float3 refract(float3 uv, float3 n, float etai
     float3 r_out_parallel = make_float3(-sqrt(fabs(1.0f - pow(length(r_out_perp), 2.0f)))) * n;
     return r_out_perp + r_out_parallel;
 }
+
+
 static __forceinline__ __device__ float distancef(float3 a, float3 b)
 {
     float3 v = b - a;
@@ -362,7 +364,7 @@ extern "C" __global__ void __closesthit__ch()
 
         //mat color
         const float2 barycentrics = optixGetTriangleBarycentrics();
-        float3 uv = make_float3(barycentrics, 1 - barycentrics.x - barycentrics.y);
+        float3 uv = make_float3(barycentrics, 1.0f - barycentrics.x - barycentrics.y);
      
         float2 uv1 = make_float2(params.uvs[vert_idx_offset]);
         float2 uv2  = make_float2(params.uvs[vert_idx_offset+1]);
@@ -406,6 +408,12 @@ extern "C" __global__ void __closesthit__ch()
 
 
         prd->direction = w_in;
+     //   prd->direction = normalize(w_in);
+        
+
+
+      
+
 
         if (mat == 1) {
 
@@ -426,7 +434,7 @@ extern "C" __global__ void __closesthit__ch()
 
 
 
-      
+
 
 
 
@@ -445,18 +453,18 @@ extern "C" __global__ void __closesthit__ch()
             col *= 10;
         }*/
 
-      /*  if (distancef(params.playerpos, P) < 2) {
+        /*  if (distancef(params.playerpos, P) < 2) {
 
-            col *= 1000;
-        }*/
-        //checker tex
+              col *= 1000;
+          }*/
+          //checker tex
 
 
-        //size of tex(small makes kind of rough)
+          //size of tex(small makes kind of rough)
         if (mat == 2) {
-
-            prd->radiance = { 10,10,10 };
-         
+            //float dist = distancef(P, origin);
+        //    prd->radiance = { 1 + 10/dist , 1 + 10 / dist, 1 + 10 / dist };
+            prd->radiance = { 2 , 2,2};
             prd->done = true;
             return;
         }
@@ -464,7 +472,7 @@ extern "C" __global__ void __closesthit__ch()
 
 
 
-        prd->attenuation *= col;
+        prd->attenuation *= col ;
         prd->countEmitted = false;
     
         if (distancef(params.playerpos, P) > 80) {

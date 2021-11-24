@@ -1,43 +1,70 @@
 
-#include <glad/glad.h> 
 
-#include <cuda_gl_interop.h>
+//glfw
+#include <glad/glad.h> 
+#include <GLFW/glfw3.h>
+//optix
 #include <optix.h>
 #include <optix_function_table_definition.h>
 #include <optix_stack_size.h>
 #include <optix_stubs.h>
-#include <sutil/GLDisplay.h>
+
+
+//cuda
 #include <cuda_runtime.h>
-#include <numeric>
-#include <sampleConfig.h>
+#include <cuda_gl_interop.h>
+
+//utils
 #include <sutil/sutil.h>
+#include <sutil/GLDisplay.h>
 #include <sutil/CUDAOutputBuffer.h>
-#include <sutil/Exception.h>
-#include <map>
-#include <GLFW/glfw3.h>
-#include "buffer.h"
-#include <sutil/Exception.h>
-#include <array>
-#include <iomanip>
-#include <iostream>
-#include <string>
-#include <vector>
 #include <sutil/Camera.h>
 #include <sutil/Trackball.h>
 
-# include "FastNoiseLite.h"
-#include <thread>
-#include <algorithm>
-#include <cstdlib>
-#include <atomic>
-#include <vector>
-#include <mutex>
-bool  shift = false;
-float delta = 0;
-float3 moveto = { 0,0,0 };
-sutil::Trackball trackball;
-sutil::Camera cam;
 
+//types
+#include <map>
+#include <array>
+#include <vector>
+#include <string>
+
+
+//io
+#include <iomanip>
+#include <iostream>
+
+//buffer
+#include "buffer.h"
+
+
+//multithreading
+#include <thread>
+#include <mutex>
+
+
+//algorithms
+# include "FastNoiseLite.h"
+#include <algorithm>
+#include <atomic>
+
+
+int viewdist = 6;
+const int size = 32;
+
+int         width = 2000;
+int         height = 1080;
+
+
+
+
+
+const int halfsize = size / 2;
+
+sutil::Camera cam;
+std::mutex lock;
+
+
+//sbt record
 template <typename T>
 struct SbtRecord
 {
@@ -49,153 +76,10 @@ typedef SbtRecord<RayGenData>     RayGenSbtRecord;
 typedef SbtRecord<MissData>       MissSbtRecord;
 typedef SbtRecord<HitGroupData>   HitGroupSbtRecord;
 
-
-float3 playerpos = { 0,0,2.0f };
-
-
-void printUsageAndExit(const char* argv0)
-{
-    std::cerr << "Usage  : " << argv0 << " [options]\n";
-    std::cerr << "Options: --file | -f <filename>      Specify file for image output\n";
-    std::cerr << "         --help | -h                 Print this usage message\n";
-    std::cerr << "         --dim=<width>x<height>      Set image dimensions; defaults to 512x384\n";
-    exit(1);
-}
-
-
-static void context_log_cb(unsigned int level, const char* tag, const char* message, void* /*cbdata */)
-{
-    std::cerr << "[" << std::setw(2) << level << "][" << std::setw(12) << tag << "]: "
-        << message << "\n";
-}
-/*
-   */
+//utitlity functions:
 
 
 
-
-int viewdist = 6;
-const int size = 32;
-const int halfsize = size / 2;
-
-
-
-
-
-
-
-
-
-
-
-
-
-float3 latestindex = { 0,0,0 };
-class Vertexmanager {       // The class
-public:             // Access specifier
-    std::vector<float3> vertices;
-    std::vector<float3> newvertices;
-
-    std::vector<float4> uvs;
-    std::vector<float4> newuvs;
-
-    std::vector<float3> index;
-    std::vector<float3> newindex;
-    void removechunk(float3 pos);
-    void cull();
-   void updatechunk(float3 po);
-    void updatenew();
-    void add(float3 pos,float4 uvs,float3 i);
-    void addtri(float3 a, float3 b, float3 c,float4 uva, float2 uvb, float2 uvc,float3 i);
-    void addplane(float3 a, float3 b, float3 c, float3 d,float mat,float3 i);
-    int getlatestindex();
-
-};
-
-
-
-int Vertexmanager::getlatestindex() {
-    return vertices.size() + newvertices.size() - 2;
-
-}
-class chunk {       // The class
-public:             // Access specifier
-    void Generate(Vertexmanager& verts, FastNoiseLite Noise);
-    void remove();
-
-    float3 position;
-    chunk();
-    chunk(const chunk& obj);  // copy constructor
-
-};
-chunk::chunk() {
-
-}
-chunk::chunk(const chunk& obj) {
-    //copy constuctor
-  //  std::cout << "Copy constructor allocating ptr.";
-   // copy the value
-}
-
-std::mutex lock;
-std::vector<float3> inputs;
-;
-struct Float3Compare
-{
-    bool operator() (const float3& lhs, const float3& rhs) const
-    {
-        return lhs.x < rhs.x
-            || (lhs.x == rhs.x && (lhs.y < rhs.y
-                || (lhs.y == rhs.y && lhs.z < rhs.z)));
-    }
-};
-
-class changemanager{       // The class
-public:
-    // Access specifier
-    void registerchange(float4 w);
-    std::map<float3, int, Float3Compare> changes;
-    float getchange(float3 w);
-};
-
-void changemanager::registerchange(float4 w) {
-
-    changes[make_float3(w)] = w.w;
-
-}
-
-float changemanager::getchange(float3 w) {
-    if (changes.find(w) == changes.end()) {
-        return -1;
-    }
-    else {
-        return changes[w];
-    }
-}
-class world {       // The class
-public:  
-    // Access specifier
-    FastNoiseLite worldnoise;
-    changemanager change;
-    world() {
-
-        worldnoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    };
-    Vertexmanager verts;
-    std::vector<float3> chunks;
-
-
-    void addchunk(float3 pos);
-};
-world mainworld;
-
-void Vertexmanager::add(float3 pos,float4 uvs,float3 i) {
-    lock.lock();
-    newvertices.push_back(pos);
-    newuvs.push_back(uvs);
-    newindex.push_back(i);
-    lock.unlock();
-}
 float distance(float3 a, float3 b)
 {
     float d = sqrt(pow(b.x - a.x, 2) +
@@ -225,8 +109,6 @@ bool Within3DManhattanDistance(float3 c1, float3 c2, float distance)
 
     return true; // we're within the cube
 }
-
-
 float3 getpos(float3 where)
 {
     where.x = roundf(where.x / size) * size;
@@ -235,7 +117,105 @@ float3 getpos(float3 where)
     return where;
 
 }
-float3 cpos;
+struct Float3Compare
+{
+    bool operator() (const float3& lhs, const float3& rhs) const
+    {
+        return lhs.x < rhs.x
+            || (lhs.x == rhs.x && (lhs.y < rhs.y
+                || (lhs.y == rhs.y && lhs.z < rhs.z)));
+    }
+};
+
+struct compare
+{
+    float3 key;
+    compare(float3 const& i) : key(i) {}
+
+    bool operator()(float3 const& i) {
+        return (i.x == key.x && i.y == key.y && i.z == key.z);
+    }
+};
+float radians(float degrees)
+{
+    return degrees * M_PIf / 180.0f;
+}
+float degrees(float radians)
+{
+    return radians * M_1_PIf * 180.0f;
+}
+
+bool cnot(float3 a, float3 b) {
+
+    if (a.x == b.x && a.y == b.y && a.z == b.z) {
+
+        return false;
+    }
+    else {
+
+        return true;
+    }
+
+}
+
+int getindex(int x, int y, int z) {
+    return x + (size + 3) * (y + (size + 3) * z);
+
+}
+
+//classes
+//manager class
+class Vertexmanager {     
+public:           
+    std::vector<float3> vertices;
+    std::vector<float3> newvertices;
+
+    std::vector<float4> uvs;
+    std::vector<float4> newuvs;
+
+    std::vector<float3> index;
+    std::vector<float3> newindex;
+    void removechunk(float3 pos);
+    void cull(float3 pos, std::vector <float3> &chunks);
+  
+    void updatenew();
+    void add(float3 pos, float4 uvs, float3 i);
+    void addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc, float3 i);
+    void addplane(float3 a, float3 b, float3 c, float3 d, float mat, float3 i);
+
+
+};
+
+
+
+void Vertexmanager::add(float3 pos, float4 uvs, float3 i) {
+    lock.lock();
+    newvertices.push_back(pos);
+    newuvs.push_back(uvs);
+    newindex.push_back(i);
+    lock.unlock();
+}
+
+void Vertexmanager::addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc, float3 i) {
+    add(a, uva, i);
+    add(b, make_float4(uvb, 0, 0), i);
+    add(c, make_float4(uvc, 0, 0), i);
+}
+void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, float3 i) {
+
+    float y = 15;
+
+
+    float x = 2;
+    if (a.z < -5) {
+        x = 0;
+    }
+
+    float sx = 32;
+    float sy = 16;
+    addtri(a, b, c, { x / sx,(1.0f + y) / sy,mat,0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
+    addtri(a, d, c, { (1.0f + x) / sx, y / sy, mat, 0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
+}
 void Vertexmanager::updatenew() {
 
     /*
@@ -244,7 +224,7 @@ void Vertexmanager::updatenew() {
     while (newvertices.size() > 0) {
 
 
-      
+
         vertices.push_back(newvertices[0]);
 
         newvertices.erase(newvertices.begin());
@@ -258,62 +238,62 @@ void Vertexmanager::updatenew() {
         index.push_back(newindex[0]);
 
         newindex.erase(newindex.begin());
-     
+
     }
        lock.unlock();
 */
-    
-     
-
-       if (newvertices.size() > 0) {
-           lock.lock();
-           int i = 0;
-           while (i < newvertices.size()) {
 
 
 
-               vertices.push_back(newvertices[i]);
+    if (newvertices.size() > 0) {
+        lock.lock();
+        int i = 0;
+        while (i < newvertices.size()) {
 
 
 
-
-               uvs.push_back(newuvs[i]);
+            vertices.push_back(newvertices[i]);
 
 
 
 
-               index.push_back(newindex[i]);
-
-
-               i++;
-           }
+            uvs.push_back(newuvs[i]);
 
 
 
 
-           newvertices.clear();
+            index.push_back(newindex[i]);
+
+
+            i++;
+        }
 
 
 
 
-           newuvs.clear();
+        newvertices.clear();
 
 
 
 
-           newindex.clear();
-           lock.unlock();
-       }
+        newuvs.clear();
+
+
+
+
+        newindex.clear();
+        lock.unlock();
+    }
 
 }
 
 
 
 
-void Vertexmanager::cull() {
+void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
 
-    cpos = getpos(playerpos);
-   
+    pos = getpos(pos);
+
     //check very third and if far away destroy two connect ones
     /*
     int i = 0;
@@ -332,33 +312,33 @@ void Vertexmanager::cull() {
             i++;
         }
     }
-    
+
 
     */
 
-    
 
-  /*  mainworld.chunks.erase(std::remove_if(mainworld.chunks.begin(), mainworld.chunks.end() ,
-        [](float3 i) {
 
-     
-            return !Within3DManhattanDistance(cpos, i, viewdist*size);
+    /*  mainworld.chunks.erase(std::remove_if(mainworld.chunks.begin(), mainworld.chunks.end() ,
+          [](float3 i) {
 
-             
-           
-              
+
+              return !Within3DManhattanDistance(cpos, i, viewdist*size);
 
 
 
-        }), mainworld.chunks.end());
-        */
+
+
+
+
+          }), mainworld.chunks.end());
+          */
 
     int numberdelc = 0;
 
 
-    for (float3 chunk : mainworld.chunks) {
+    for (float3 chunk : chunks) {
 
-        if (!Within3DManhattanDistance(cpos, chunk, viewdist * size)) {
+        if (!Within3DManhattanDistance(pos, chunk, viewdist * size)) {
             numberdelc++;
 
         }
@@ -371,29 +351,29 @@ void Vertexmanager::cull() {
     int numberdel = 0;
 
 
-  for (float3 value : index) { 
-  
-      if (!Within3DManhattanDistance(cpos, value, viewdist * size)) {
-          numberdel++;
+    for (float3 value : index) {
 
-      }
-  
-  
-  
-  }
+        if (!Within3DManhattanDistance(pos, value, viewdist * size)) {
+            numberdel++;
+
+        }
+
+
+
+    }
     //check very third and if far away destroy two connect ones
 
 
 
-  
+
             //make vertex number divisble by 3 for coorect traingle splitting
 
-  mainworld.chunks.erase(mainworld.chunks.begin(), mainworld.chunks.begin() + numberdelc);
-  index.erase(index.begin(), index.begin() + numberdel);
-            vertices.erase(vertices.begin(), vertices.begin() + numberdel);
-            uvs.erase(uvs.begin(), uvs.begin() + numberdel);
-        
-  
+   chunks.erase(chunks.begin(),chunks.begin() + numberdelc);
+    index.erase(index.begin(), index.begin() + numberdel);
+    vertices.erase(vertices.begin(), vertices.begin() + numberdel);
+    uvs.erase(uvs.begin(), uvs.begin() + numberdel);
+
+
 }
 
 void Vertexmanager::removechunk(float3 po) {
@@ -410,7 +390,7 @@ void Vertexmanager::removechunk(float3 po) {
            vertices.erase(vertices.begin() +i );
             index.erase(index.begin() + i);
            uvs.erase(uvs.begin() + i);
-       
+
         }
         else {
 
@@ -420,20 +400,20 @@ void Vertexmanager::removechunk(float3 po) {
     }
 
     */
- 
+
 
 
     std::vector <float3> vertices2;
     std::vector <float4>uvs2;
     std::vector <float3>index2;
 
-  
+
 
     for (int i = 0; i < vertices.size(); i++)
     {
         if (index[i].x == pos.x && index[i].y == pos.y && index[i].z == pos.z) {
 
-           
+
         }
         else {
 
@@ -441,7 +421,7 @@ void Vertexmanager::removechunk(float3 po) {
             uvs2.push_back(uvs[i]);
             index2.push_back(index[i]);
         }
-         
+
     }
 
     vertices = vertices2;
@@ -454,7 +434,7 @@ void Vertexmanager::removechunk(float3 po) {
         [pos,&x](float3 i) {
 
             if (i.x == pos.x && i.x == pos.y && i.x == pos.z) {
-            
+
                 return true;
 
             }
@@ -464,117 +444,108 @@ void Vertexmanager::removechunk(float3 po) {
 
 
 
-           
+
 
 
         }), index.end());
 
         */
 
-            //make vertex number divisble by 3 for coorect traingle splitting
-  //  index.erase(index.begin(), index.begin() + numberdel);
-  //  vertices.erase(vertices.begin(), vertices.begin() + numberdel);
-  //  uvs.erase(uvs.begin(), uvs.begin() + numberdel);
+        //make vertex number divisble by 3 for coorect traingle splitting
+//  index.erase(index.begin(), index.begin() + numberdel);
+//  vertices.erase(vertices.begin(), vertices.begin() + numberdel);
+//  uvs.erase(uvs.begin(), uvs.begin() + numberdel);
 
 
 }
 
 
-void Vertexmanager::updatechunk(float3 pos) {
-    lock.lock();
-   // inputs.push_back(getpos(pos - make_float3(16, 16, 16)));
-    inputs.insert(inputs.begin(), getpos(pos - make_float3(halfsize, halfsize, halfsize)));
-    lock.unlock();
-    removechunk(pos);
 
-  
+class changemanager {
+public:
+
+    void registerchange(float4 w);
+    std::map<float3, int, Float3Compare> changes;
+    float getchange(float3 w);
+};
+
+
+
+
+
+void changemanager::registerchange(float4 w) {
+
+    changes[make_float3(w)] = w.w;
+
 }
 
-int getindex(int x, int y, int z) {
-    return x + (size + 3) * (y + (size + 3) * z);
-
-}
-
-
-
-float getBlock(float nx, float ny, float nz, FastNoiseLite noise) {
-    float r = noise.GetNoise((float)nx, (float)ny);
-    // float r3d = noise.GetNoise((float)nx*10, (float)ny * 10, (float)nz * 10);
-      //    int height = rand() % 10;
-
-    float change = mainworld.change.getchange(make_float3(nx, ny, nz));
-    if (change > -1) {
-        return change;
-
-    }
-
-    if (nz < r*6) {
-
-      
-        return 1;
-    
-
-
-
-
-
+float changemanager::getchange(float3 w) {
+    if (changes.find(w) == changes.end()) {
+        return -1;
     }
     else {
-
-
-     
-        return 0;
-
-
-
+        return changes[w];
     }
-
-
 }
 
-float3 raycast(float3 start, float3 dir, float step, int maxrange) {
-
-    dir = normalize(dir);
-
-    int c = 0;
-
-    while (c < maxrange) {
-
-        start += dir * step;
-        float3 blockpos = make_float3(round(start.x), round(start.y), round(start.z));
-
-        if (getBlock(blockpos.x, blockpos.y, blockpos.z, mainworld.worldnoise) > 0) {
-
-            return blockpos;
-        }
-
-            c++;
-    }
-
-    return { 0,0,0 };
-
-}
-
-bool isblock(float3 start) {
-
- 
-        float3 blockpos = make_float3(round(start.x), round(start.y), round(start.z));
-
-        if (getBlock(blockpos.x, blockpos.y, blockpos.z, mainworld.worldnoise) > 0) {
-
-            return true;
-        }
-
-      
-
-    return false;
-
-}
-void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
 
 
 
+
+//player class
+class Player{
+    public:
+        float3 moveto = { 0,0,0 };
+        float3 playerpos = { 0,0,2.0f };
+
+    };
+
+//chunk class
+class chunk {      
+public:          
+    void Generate(Vertexmanager& verts);
   
+
+    float3 position;
+  //  chunk();
+ //   chunk(const chunk& obj);  copy constructor
+
+};
+
+
+
+
+//global wolrd class
+class world {      
+public:
+  
+    FastNoiseLite worldnoise;
+    changemanager change;
+    world() {
+
+        worldnoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    };
+    Vertexmanager verts;
+    std::vector<float3> chunks;
+
+    std::vector<float3> inputs;
+    Player player;
+    float getBlock(float nx, float ny, float nz);
+    void addchunk(float3 pos);
+    float3 raycast(float3 start, float3 dir, float step, int maxrange);
+    bool isblock(float3 start);
+    void quechunk(float3 pos );
+    void updatechunk(float3 pos);
+};
+
+world mainworld;
+
+
+void chunk::Generate(Vertexmanager& verts) {
+
+
+
+
     int* blocks = new int[(size + 3) * (size + 3) * (size + 3)];
 
 
@@ -596,14 +567,14 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
 
                 //     srand(nx * ny * nz + nx + ny + nz);
 
-             float val = getBlock(nx, ny, nz, noise);
+                float val = mainworld.getBlock(nx, ny, nz);
 
-             blocks[getindex(x, y, z)] = val;
-             if (val > 0 && empty == true) {
+                blocks[getindex(x, y, z)] = val;
+                if (val > 0 && empty == true) {
 
-                 empty = false;
+                    empty = false;
                 }
-                
+
 
 
 
@@ -636,7 +607,7 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
 
                     int mat = 0;
 
-                  
+
                     //1 for reflective zero for diffuse
 
 
@@ -648,7 +619,7 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
 
                             mat = blocks[getindex(x + 2, y + 1, z + 1)] - 1;
 
-                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat,position);
+                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position);
 
 
 
@@ -690,7 +661,7 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
                         {
                             mat = blocks[getindex(x + 1, y + 2, z + 1)] - 1;
 
-                            verts.addplane(make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat,position);
+                            verts.addplane(make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position);
 
 
 
@@ -714,7 +685,7 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
                         if (blocks[getindex(x + 1, y + 1, z + 2)] > 0)
                         {
 
-                            mat = blocks[getindex(x + 1, y + 1, z + 2)]-1;
+                            mat = blocks[getindex(x + 1, y + 1, z + 2)] - 1;
                             verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position);
 
 
@@ -740,36 +711,41 @@ void chunk::Generate(Vertexmanager& verts,FastNoiseLite noise) {
     delete[] blocks;
 }
 
-void chunk::remove() {
 
+void world::updatechunk(float3 pos) {
+    lock.lock();
+    // inputs.push_back(getpos(pos - make_float3(16, 16, 16)));
+    inputs.insert(inputs.begin(), getpos(pos - make_float3(halfsize, halfsize, halfsize)));
+    lock.unlock();
+    verts.removechunk(pos);
 
 
 }
+void world::quechunk(float3 pos ) {
+    if (std::find_if(chunks.begin(), chunks.end(), compare(pos)) != chunks.end()) {
 
 
-bool canedit = false;
-void Vertexmanager::addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc,float3 i) {
-    add(a,uva,i);
-    add(b,make_float4(uvb,0,0),i);
-    add(c, make_float4(uvc, 0, 0),i);
-}
-struct compare
-{
-    float3 key;
-    compare(float3 const& i) : key(i) {}
 
-    bool operator()(float3 const& i) {
-        return (i.x == key.x && i.y == key.y && i.z == key.z);
+
+
+
     }
-};
+    else {
+        lock.lock();
+        inputs.push_back(pos);
+        lock.unlock();
+    }
+}
+
+
 void world::addchunk(float3 pos) {
 
 
 
     chunk c;
     c.position = pos;
-  
-    c.Generate(verts, worldnoise);
+
+    c.Generate(verts);
     lock.lock();
     chunks.push_back(pos);
     lock.unlock();
@@ -784,31 +760,112 @@ void world::addchunk(float3 pos) {
 }
 
 
+bool world::isblock(float3 start) {
 
 
-bool threadrunning = false;
-void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat,float3 i) {
-   // addtri(a, b, c, { 0,1,mat,0 }, { 0,0 }, {1,1},i);
-  //  addtri(a, d, c, { 1,0,mat,0 }, { 1,1 }, { 0,0 },i);
+    float3 blockpos = make_float3(round(start.x), round(start.y), round(start.z));
 
-    float y = 15;
+    if (getBlock(blockpos.x, blockpos.y, blockpos.z ) > 0) {
 
-    
-    float x = 2;
-    if (a.z < -5) {
-        x = 0;
+        return true;
     }
 
-    float sx = 32;
-    float sy = 16;
-    addtri(a, b, c, { x / sx,(1.0f + y) / sy,mat,0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
-    addtri(a, d, c, { (1.0f + x) / sx, y / sy, mat, 0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
-}
-//{ (1.0f + x) / sx, y / sy, mat, 0 }, { (1.0f + x) / sx,(1.0f + y) / sy }, { x / sx,y / sy }
 
-// float2 uv1 = { 0,1 };
- //   float2 uv2 = { 0,0 };
- //    float2 uv3 = { 1,1 };
+
+    return false;
+
+}
+
+float world::getBlock(float nx, float ny, float nz) {
+    float r = worldnoise.GetNoise((float)nx, (float)ny);
+    // float r3d = noise.GetNoise((float)nx*10, (float)ny * 10, (float)nz * 10);
+      //    int height = rand() % 10;
+
+    float changes = change.getchange(make_float3(nx, ny, nz));
+    if (changes > -1) {
+        return changes;
+
+    }
+
+    if (nz < r * 6) {
+
+
+        return 1;
+
+
+
+
+
+
+    }
+    else {
+
+
+
+        return 0;
+
+
+
+    }
+
+
+}
+
+float3 world::raycast(float3 start, float3 dir, float step, int maxrange) {
+
+    dir = normalize(dir);
+
+    int c = 0;
+
+    while (c < maxrange) {
+
+        start += dir * step;
+        float3 blockpos = make_float3(round(start.x), round(start.y), round(start.z));
+
+        if (getBlock(blockpos.x, blockpos.y, blockpos.z) > 0) {
+
+            return blockpos;
+        }
+
+        c++;
+    }
+
+    return { 0,0,0 };
+
+}
+
+//log
+static void context_log_cb(unsigned int level, const char* tag, const char* message, void* /*cbdata */)
+{
+    std::cerr << "[" << std::setw(2) << level << "][" << std::setw(12) << tag << "]: "
+        << message << "\n";
+}
+
+
+
+//globals
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bool canedit = false;
+bool threadrunning = false;
+
+
 void chunkthread() {
     threadrunning = true;
 
@@ -820,14 +877,14 @@ void chunkthread() {
 
 
 
-            int size = inputs.size();
+            int size = mainworld.inputs.size();
             float3 in;
             bool n = false;
             if (size > 0) {
                 lock.lock();
                 n = true;
-                in = inputs[0];
-                inputs.erase(inputs.begin());
+                in = mainworld.inputs[0];
+                mainworld.inputs.erase(mainworld.inputs.begin());
                 lock.unlock();
             }
 
@@ -848,93 +905,11 @@ void chunkthread() {
 
         }
 
-        /* if (canedit) {
-            j++;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            if (j < 6000) {
-                for (int x = 0; x < 5; x++)
-                {
-                    for (int y = 0; y < 5; y++)
-                    {
-                        mainworld.addchunk({ j * 5 + 0.0001f + x,y+0.000f,(rand() % 100) / 100.0f });
-                    }
-
-
-                }
-
-            }
-
-           int j = 0;
-    float3 now = make_float3(0)+ (size/2);
-    float3 nnow =make_float3(0)+(size / 2);
-    float3 center = { 0,0,0 };
-
-               if (playerpos.x > now.x)
-            {
-
-
-                now.x += size;
-                nnow.x += size;
-                center.x += size;
-                mainworld.addchunk(center);
-            }
-            if (playerpos.z > now.z)
-            {
-
-
-                now.z += size;
-                nnow.z += size;
-
-                center.z += size;
-                mainworld.addchunk(center);
-            }
-            if (playerpos.x < nnow.x)
-            {
-
-
-                nnow.x -= size;
-                now.x -= size;
-
-                center.x -= size;
-                mainworld.addchunk(center);
-            }
-            if (playerpos.z < nnow.z)
-            {
-
-
-                nnow.z -= size;
-                now.z -= size;
-                center.z -= size;
-                mainworld.addchunk(center);
-            }
-
-            if (playerpos.y < nnow.y)
-            {
-
-
-                nnow.y -= size;
-                now.y -= size;
-
-                center.y -= size;
-                mainworld.addchunk(center);
-            }
-
-
-            if (playerpos.y > now.y)
-            {
-
-
-                now.y += size;
-                nnow.y += size;
-                center.y += size;
-                mainworld.addchunk(center);
-            }
-
-        }*/
+  
 
 
     }
-    //   mainworld.startchunks();
+  
 
 }
 
@@ -942,25 +917,13 @@ void chunkthread() {
 
 
 
-void displaySubframe(sutil::CUDAOutputBuffer<uchar4>& output_buffer, sutil::GLDisplay& gl_display, GLFWwindow* window)
-{
-    // Display
-    int framebuf_res_x = 0;  // The display's resolution (could be HDPI res)
-    int framebuf_res_y = 0;  //
-    glfwGetFramebufferSize(window, &framebuf_res_x, &framebuf_res_y);
-    gl_display.display(
-        output_buffer.width(),
-        output_buffer.height(),
-        framebuf_res_x,
-        framebuf_res_y,
-        output_buffer.getPBO()
-    );
-}
+
 bool jumping = false;
+bool shift = false;
 static void keyCallback(GLFWwindow* window, int32_t key, int32_t /*scancode*/, int32_t action, int32_t /*mods*/)
 {
- 
-    float3 dir = normalize(playerpos - moveto);
+    
+    float3 dir = normalize(mainworld.player.playerpos - mainworld.player.moveto);
     if (action == GLFW_PRESS)
     {
         if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE)
@@ -974,29 +937,22 @@ static void keyCallback(GLFWwindow* window, int32_t key, int32_t /*scancode*/, i
     {
 
         if (shift) {
-            playerpos.x -= dir.x  ;
-            playerpos.y -= dir.y ;
+            mainworld.player.playerpos.x -= dir.x  ;
+            mainworld.player.playerpos.y -= dir.y ;
         }
         else {
-            playerpos.x -= dir.x / 5;
-            playerpos.y -= dir.y / 5;
+            mainworld.player.playerpos.x -= dir.x / 5;
+            mainworld.player.playerpos.y -= dir.y / 5;
 
         }
 
     }
     else if (key == GLFW_KEY_S)
     {
-        playerpos.x += dir.x / 10 ;
-        playerpos.y += dir.y / 10;
+        mainworld.player.playerpos.x += dir.x / 10 ;
+        mainworld.player.playerpos.y += dir.y / 10;
     }
-    else if (key == GLFW_KEY_D)
-    {
-        playerpos.x += 0.1f;
-    }
-    else if (key == GLFW_KEY_A)
-    {
-        playerpos.x -= 0.1f;
-    }
+ 
      if (key == GLFW_KEY_SPACE)
     {
          if (action == GLFW_PRESS) {
@@ -1007,43 +963,20 @@ static void keyCallback(GLFWwindow* window, int32_t key, int32_t /*scancode*/, i
              jumping = false;
          }
         
-        playerpos.z +=0.5;
+         mainworld.player.playerpos.z +=0.5;
     }
     else if (key == GLFW_KEY_X)
     {
-        playerpos.z -= 0.1f;
+         mainworld.player.playerpos.z -= 0.1f;
     }
     else if (key == GLFW_KEY_LEFT_SHIFT)
     {
         shift = true;
     }
-    else if (key == GLFW_KEY_RIGHT_SHIFT)
-    {
-        shift = false;
-    }
+  
 
 }
-float radians(float degrees)
-{
-    return degrees * M_PIf / 180.0f;
-}
-float degrees(float radians)
-{
-    return radians * M_1_PIf * 180.0f;
-}
 
-bool cnot(float3 a, float3 b) {
-
-    if (a.x == b.x && a.y == b.y && a.z == b.z) {
-
-        return false;
-    }
-    else {
-
-        return true;
-    }
-
-}
 
 
 static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -1053,7 +986,7 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
     if (action == GLFW_PRESS)
     {
       
-        float3 cast = raycast(playerpos, cam.direction(), 0.1, 400);
+        float3 cast = mainworld.raycast(mainworld.player.playerpos, cam.direction(), 0.1, 400);
         if (cast.x == 0 && cast.y == 0 && cast.z == 0) {
 
       //      std::cout << "none \n";
@@ -1076,7 +1009,7 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
                 }
 
            
-               float3 start = (normalize(playerpos-cast));
+               float3 start = (normalize(mainworld.player.playerpos-cast));
                if (abs(start.x) > abs(start.z) && abs(start.x) > abs(start.y)) {
 
                    start.z = 0;
@@ -1103,39 +1036,39 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
 
             }
             mainworld.change.registerchange(make_float4(cast, u));
-            mainworld.verts.updatechunk(cast);
+            mainworld.updatechunk(cast);
             float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize));
             float3 po =cast - make_float3(halfsize, halfsize, halfsize);
 
        
             if (cnot(getpos(po + make_float3(0, 0, 2)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(0, 0, 2));
+                mainworld.updatechunk(cast + make_float3(0, 0, 2));
 
          }
 
             if (cnot(getpos(po + make_float3(0, 0, -2)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(0, 0, -2));
+                mainworld.updatechunk(cast + make_float3(0, 0, -2));
 
             }
        
 
             if (cnot(getpos(po + make_float3(0, 2, 0)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(0, 2, 0));
+                mainworld.updatechunk(cast + make_float3(0, 2, 0));
 
             }
 
             if (cnot(getpos(po + make_float3(0, -2, 0)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(0, -2, 0));
+                mainworld.updatechunk(cast + make_float3(0, -2, 0));
 
             }
 
             if (cnot(getpos(po + make_float3(2, 0, 0)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(2, 0, 0));
+                mainworld.updatechunk(cast + make_float3(2, 0, 0));
 
             }
 
             if (cnot(getpos(po + make_float3(-2, 0, 0)), pos)) {
-                mainworld.verts.updatechunk(cast + make_float3(-2, 0, 0));
+                mainworld.updatechunk(cast + make_float3(-2, 0, 0));
 
             }
 
@@ -1152,58 +1085,34 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
 }
 
 
-void quechunk(float3 pos) {
-    if (std::find_if(mainworld.chunks.begin(), mainworld.chunks.end(), compare(pos)) != mainworld.chunks.end()) {
-
-
-
-
-
-
-    }
-    else {
-        lock.lock();
-        inputs.push_back(pos);
-        lock.unlock();
-    }
+void displaySubframe(sutil::CUDAOutputBuffer<uchar4>& output_buffer, sutil::GLDisplay& gl_display, GLFWwindow* window)
+{
+    // Display
+    int framebuf_res_x = 0;  // The display's resolution (could be HDPI res)
+    int framebuf_res_y = 0;  //
+    glfwGetFramebufferSize(window, &framebuf_res_x, &framebuf_res_y);
+    gl_display.display(
+        output_buffer.width(),
+        output_buffer.height(),
+        framebuf_res_x,
+        framebuf_res_y,
+        output_buffer.getPBO()
+    );
 }
 
 int main(int argc, char* argv[])
 {
  
-    std::string outfile;
-    int         width = 2000;
-    int         height = 1080;
+  
+ 
 
-    for (int i = 1; i < argc; ++i)
-    {
-        const std::string arg(argv[i]);
-        if (arg == "--help" || arg == "-h")
-        {
-            printUsageAndExit(argv[0]);
-        }
-        else if (arg == "--file" || arg == "-f")
-        {
-            if (i < argc - 1)
-            {
-                outfile = argv[++i];
-            }
-            else
-            {
-                printUsageAndExit(argv[0]);
-            }
-        }
-        else if (arg.substr(0, 6) == "--dim=")
-        {
-            const std::string dims_arg = arg.substr(6);
-            sutil::parseDimensions(dims_arg.c_str(), width, height);
-        }
-        else
-        {
-            std::cerr << "Unknown option '" << arg << "'\n";
-            printUsageAndExit(argv[0]);
-        }
-    }
+
+   
+   
+  
+    sutil::Trackball trackball;
+ 
+  
 
     try
     {
@@ -1443,17 +1352,7 @@ int main(int argc, char* argv[])
 
 
         //
-        // launch
-        //
-        {
-
-
-
-        }
-
-        //
-        // Display results
-        //
+     
         int i = 0;
 
         GLFWwindow* window = sutil::initUI("Minecraft 3", width, height);
@@ -1462,9 +1361,7 @@ int main(int argc, char* argv[])
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetKeyCallback(window, keyCallback);
         glfwSetMouseButtonCallback(window, mouseButtonCallback);
-        //
-        // Render loop
-        //
+      
 
 
         {
@@ -1590,7 +1487,7 @@ int main(int argc, char* argv[])
             trackball.startTracking(static_cast<int>(xpos), static_cast<int>(ypos));
             clock_t start = clock();
             clock_t nowt;
-            float3 now = getpos(playerpos);
+            float3 now = getpos(mainworld.player.playerpos);
 
 
 
@@ -1623,7 +1520,7 @@ int main(int argc, char* argv[])
             size_t uvs_size;
 
 
-
+            float delta = 0;
             //    std::cout << cam.lookat().x;
             do
             {
@@ -1641,18 +1538,18 @@ int main(int argc, char* argv[])
             
              
 
-                if (isblock(playerpos + make_float3(0, 0, -2.5))) {
+                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2.5))) {
 
-                     playerpos.z += 0.05;
+                    mainworld.player.playerpos.z += 0.05;
 
                 }
-                if (isblock(playerpos + make_float3(0, 0, -2))) {
+                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2))) {
 
-                    playerpos.z += 0.1;
+                    mainworld.player.playerpos.z += 0.1;
 
                 }
                 if (!jumping) {
-                    playerpos.z -= 0.05;
+                    mainworld.player.playerpos.z -= 0.05;
 
 
 
@@ -1682,20 +1579,20 @@ int main(int argc, char* argv[])
                 canedit = false;
 
 
-                float3 cposs = getpos(playerpos);
+                float3 cposs = getpos(mainworld.player.playerpos);
 
 
 
                 if (cposs.x != now.x || cposs.y != now.y || cposs.z != now.z)
                 {
-                    mainworld.verts.cull();
+                    mainworld.verts.cull(mainworld.player.playerpos,mainworld.chunks);
                     lock.lock();
-                    inputs.clear();
+                    mainworld.inputs.clear();
                     lock.unlock();
                     now = cposs;
                     
 
-                        quechunk(cposs);
+                        mainworld.quechunk(cposs);
                     
                     
                   
@@ -1714,7 +1611,7 @@ int main(int argc, char* argv[])
                                 
                               
 
-                                    quechunk(pos);
+                                    mainworld.quechunk(pos);
                                 
                             }
 
@@ -1853,13 +1750,13 @@ int main(int argc, char* argv[])
                 t1 = std::chrono::steady_clock::now();
                 state_update_time += t1 - t0;
                 t0 = t1;
-                cam.setEye(playerpos);
+                cam.setEye(mainworld.player.playerpos);
                 glfwGetCursorPos(window, &xpos, &ypos);
 
                 trackball.updateTracking(static_cast<int>(xpos), static_cast<int>(ypos), width, height);
 
 
-                moveto = cam.lookat();
+                mainworld.player.moveto = cam.lookat();
                 params.verts = reinterpret_cast<float3*>(d_vertices);
                 params.uvs = reinterpret_cast<float4*>(d_uvs);
                 params.image = output_buffer.map();
@@ -1867,7 +1764,7 @@ int main(int argc, char* argv[])
                 params.image_height = height;
                 params.handle = gas_handle;
                 params.cam_eye = cam.eye();
-                params.playerpos = playerpos;
+                params.playerpos = mainworld.player.playerpos;
 
                 cam.UVWFrame(params.cam_u, params.cam_v, params.cam_w);
 
