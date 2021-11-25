@@ -53,7 +53,7 @@ const int size = 32;
 
 int         width = 2000;
 int         height = 1080;
-
+int MSAA = 2;
 
 
 
@@ -181,7 +181,7 @@ public:
     void updatenew();
     void add(float3 pos, float4 uvs, float3 i);
     void addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc, float3 i);
-    void addplane(float3 a, float3 b, float3 c, float3 d, float mat, float3 i);
+    void addplane(float3 a, float3 b, float3 c, float3 d, float mat, float3 i, int side);
 
 
 };
@@ -201,16 +201,46 @@ void Vertexmanager::addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb,
     add(b, make_float4(uvb, 0, 0), i);
     add(c, make_float4(uvc, 0, 0), i);
 }
-void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, float3 i) {
+void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, float3 i, int side) {
 
     float y = 15;
 
 
     float x = 2;
-    if (a.z < -5) {
+    if (side < 5) {
+        x = 3;
+
+    }
+    else if (side == 5) {
+
+        x = 18;
+
+        y = 14;
+    }
+
+    if (mat==4) {
         x = 0;
     }
 
+    //2
+    if (mat == 1) {
+        x = 15;
+        y = 12;
+    }
+    if (mat == 6) {
+
+        x = 24;
+
+        y = 11;
+    }
+
+
+    if (mat == 7) {
+
+        x = 21;
+
+        y = 14;
+    }
     float sx = 32;
     float sy = 16;
     addtri(a, b, c, { x / sx,(1.0f + y) / sy,mat,0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
@@ -317,22 +347,6 @@ void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
     */
 
 
-
-    /*  mainworld.chunks.erase(std::remove_if(mainworld.chunks.begin(), mainworld.chunks.end() ,
-          [](float3 i) {
-
-
-              return !Within3DManhattanDistance(cpos, i, viewdist*size);
-
-
-
-
-
-
-
-          }), mainworld.chunks.end());
-          */
-
     int numberdelc = 0;
 
 
@@ -361,13 +375,7 @@ void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
 
 
     }
-    //check very third and if far away destroy two connect ones
-
-
-
-
-            //make vertex number divisble by 3 for coorect traingle splitting
-
+   
    chunks.erase(chunks.begin(),chunks.begin() + numberdelc);
     index.erase(index.begin(), index.begin() + numberdel);
     vertices.erase(vertices.begin(), vertices.begin() + numberdel);
@@ -379,28 +387,7 @@ void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
 void Vertexmanager::removechunk(float3 po) {
 
     float3 pos = getpos(po - make_float3(halfsize, halfsize, halfsize));
-    /*
-
-    int i = 0;
-    while (i < vertices.size()) {
-
-        if (index[i].x == pos.x && index[i].y ==pos.y && index[i].z ==pos.z) {
-
-
-           vertices.erase(vertices.begin() +i );
-            index.erase(index.begin() + i);
-           uvs.erase(uvs.begin() + i);
-
-        }
-        else {
-
-
-            i++;
-        }
-    }
-
-    */
-
+  
 
 
     std::vector <float3> vertices2;
@@ -408,14 +395,18 @@ void Vertexmanager::removechunk(float3 po) {
     std::vector <float3>index2;
 
 
-
-    for (int i = 0; i < vertices.size(); i++)
+    int isze = vertices.size();
+    vertices2.reserve(isze);
+    uvs2.reserve(isze);
+    index2.reserve(isze);
+    for (int i = 0; i < isze; i++)
     {
         if (index[i].x == pos.x && index[i].y == pos.y && index[i].z == pos.z) {
-
+          
 
         }
         else {
+        
 
             vertices2.push_back(vertices[i]);
             uvs2.push_back(uvs[i]);
@@ -427,34 +418,7 @@ void Vertexmanager::removechunk(float3 po) {
     vertices = vertices2;
     uvs = uvs2;
     index = index2;
-    /*
-
-    int x = 0;
-    index.erase(std::remove_if(index.begin(), index.end(),
-        [pos,&x](float3 i) {
-
-            if (i.x == pos.x && i.x == pos.y && i.x == pos.z) {
-
-                return true;
-
-            }
-            x++;
-            return false;
-
-
-
-
-
-
-
-        }), index.end());
-
-        */
-
-        //make vertex number divisble by 3 for coorect traingle splitting
-//  index.erase(index.begin(), index.begin() + numberdel);
-//  vertices.erase(vertices.begin(), vertices.begin() + numberdel);
-//  uvs.erase(uvs.begin(), uvs.begin() + numberdel);
+ 
 
 
 }
@@ -480,7 +444,7 @@ void changemanager::registerchange(float4 w) {
 }
 
 float changemanager::getchange(float3 w) {
-    if (changes.find(w) == changes.end()) {
+    if (changes.count(w) == 0) {
         return -1;
     }
     else {
@@ -497,9 +461,16 @@ class Player{
     public:
         float3 moveto = { 0,0,0 };
         float3 playerpos = { 0,0,2.0f };
+        float vz = 0;
 
+        void update(float delta);
     };
 
+
+void Player::update(float delta){
+
+   playerpos.z += vz*delta;
+    }
 //chunk class
 class chunk {      
 public:          
@@ -619,7 +590,7 @@ void chunk::Generate(Vertexmanager& verts) {
 
                             mat = blocks[getindex(x + 2, y + 1, z + 1)] - 1;
 
-                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position,1);
 
 
 
@@ -629,7 +600,7 @@ void chunk::Generate(Vertexmanager& verts) {
                         if (blocks[getindex(x, y + 1, z + 1)] > 0)
                         {
                             mat = blocks[getindex(x, y + 1, z + 1)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position,2);
 
 
 
@@ -645,11 +616,11 @@ void chunk::Generate(Vertexmanager& verts) {
                             mat = blocks[getindex(x + 1, y, z + 1)] - 1;
 
 
-                            verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, mat, position,4);
 
 
 
-
+                         
 
 
 
@@ -661,7 +632,7 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
                             mat = blocks[getindex(x + 1, y + 2, z + 1)] - 1;
 
-                            verts.addplane(make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position,3);
 
 
 
@@ -675,7 +646,7 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
 
                             mat = blocks[getindex(x + 1, y + 1, z)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position,6);
 
 
 
@@ -686,7 +657,7 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
 
                             mat = blocks[getindex(x + 1, y + 1, z + 2)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position);
+                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position,5);
 
 
                         }
@@ -789,7 +760,10 @@ float world::getBlock(float nx, float ny, float nz) {
 
     if (nz < r * 6) {
 
+        if (nz < r*6-10) {
+            return 5;
 
+        }
         return 1;
 
 
@@ -918,12 +892,19 @@ void chunkthread() {
 
 
 
-bool jumping = false;
+
 bool shift = false;
+
 static void keyCallback(GLFWwindow* window, int32_t key, int32_t /*scancode*/, int32_t action, int32_t /*mods*/)
 {
     
-    float3 dir = normalize(mainworld.player.playerpos - mainworld.player.moveto);
+  
+   
+    if (action == GLFW_RELEASE)
+    {
+       
+
+    }
     if (action == GLFW_PRESS)
     {
         if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE)
@@ -932,149 +913,202 @@ static void keyCallback(GLFWwindow* window, int32_t key, int32_t /*scancode*/, i
             threadrunning = false;
             glfwSetWindowShouldClose(window, true);
         }
-    }
-    else if (key == GLFW_KEY_W)
-    {
+        if (key == GLFW_KEY_SPACE)
+        {
+            mainworld.player.vz += 0.01;
 
-        if (shift) {
-            mainworld.player.playerpos.x -= dir.x  ;
-            mainworld.player.playerpos.y -= dir.y ;
-        }
-        else {
-            mainworld.player.playerpos.x -= dir.x / 5;
-            mainworld.player.playerpos.y -= dir.y / 5;
 
         }
+        else if (key == GLFW_KEY_LEFT_SHIFT)
+        {
+            shift = true;
+        }
+
+        else if (key == GLFW_KEY_RIGHT_SHIFT)
+        {
+            shift = false;
+        }
+        else if (key == GLFW_KEY_RIGHT)
+        {
+            MSAA += 1;
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+
+        else if (key == GLFW_KEY_LEFT)
+        {
+            MSAA -= 1;
+
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+        else if (key == GLFW_KEY_UP)
+        {
+            MSAA += 10;
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+
+        else if (key == GLFW_KEY_DOWN)
+        {
+            MSAA -= 10;
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+        else if (key == GLFW_KEY_0)
+        {
+            MSAA = 2;
+            std::cout << "samples reset to: " << MSAA << " \n";
+        }
+        else if (key == GLFW_KEY_1)
+        {
+            MSAA = 50;
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+        else if (key == GLFW_KEY_2)
+        {
+            MSAA = 100;
+            std::cout << "samples set to: " << MSAA << " \n";
+        }
+
+      
 
     }
-    else if (key == GLFW_KEY_S)
-    {
-        mainworld.player.playerpos.x += dir.x / 10 ;
-        mainworld.player.playerpos.y += dir.y / 10;
-    }
+
+  
  
-     if (key == GLFW_KEY_SPACE)
-    {
-         if (action == GLFW_PRESS) {
-             jumping = true;
-         }
-         if (action == GLFW_RELEASE) {
-
-             jumping = false;
-         }
-        
-         mainworld.player.playerpos.z +=0.5;
-    }
-    else if (key == GLFW_KEY_X)
-    {
-         mainworld.player.playerpos.z -= 0.1f;
-    }
-    else if (key == GLFW_KEY_LEFT_SHIFT)
-    {
-        shift = true;
-    }
   
 
 }
 
-
+int selectedblock = 2;
 
 static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
  
 
-    if (action == GLFW_PRESS)
+    if (action == GLFW_PRESS )
     {
-      
-        float3 cast = mainworld.raycast(mainworld.player.playerpos, cam.direction(), 0.1, 400);
-        if (cast.x == 0 && cast.y == 0 && cast.z == 0) {
+        if (button == GLFW_MOUSE_BUTTON_RIGHT || button == GLFW_MOUSE_BUTTON_LEFT) {
+            float3 cast = mainworld.raycast(mainworld.player.playerpos, cam.direction(), 0.3, 50);
+            if (cast.x == 0 && cast.y == 0 && cast.z == 0) {
 
-      //      std::cout << "none \n";
+                //      std::cout << "none \n";
 
 
-        }
-        else {
-          //  cast = cast+ make_float3(0, 0, 2);
-        //    std::cout << "(" << cast.x << "," << cast.y << "," << cast.z << ") \n";
-      //      mainworld.verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + cast, make_float3(0.5f, -0.5f, -0.5f) + cast, make_float3(-0.5f, 0.5f, -0.5f) + cast, make_float3(0.5f, 0.5f, -0.5f) + cast, 0, make_float3( 0,0,0 ));
+            }
+            else {
+                //  cast = cast+ make_float3(0, 0, 2);
+              //    std::cout << "(" << cast.x << "," << cast.y << "," << cast.z << ") \n";
+            //      mainworld.verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + cast, make_float3(0.5f, -0.5f, -0.5f) + cast, make_float3(-0.5f, 0.5f, -0.5f) + cast, make_float3(0.5f, 0.5f, -0.5f) + cast, 0, make_float3( 0,0,0 ));
 
-            int u = 0;
+                int u = 0;
+             
+                if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 
-            if (button == GLFW_MOUSE_BUTTON_RIGHT || button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                    u = selectedblock;
 
-                u = 1;
-                if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
 
-                    u = 3;
+
+
+                    float3 start = (normalize(mainworld.player.playerpos - cast));
+                    if (abs(start.x) > abs(start.z) && abs(start.x) > abs(start.y)) {
+
+                        start.z = 0;
+                        start.y = 0;
+                    }
+
+
+
+                    else if (abs(start.y) > abs(start.z) && abs(start.y) > abs(start.x)) {
+
+                        start.z = 0;
+                        start.x = 0;
+                    }
+
+
+                    else {
+
+                        start.x = 0;
+                        start.y = 0;
+                    }
+
+
+
+                    start = make_float3(roundf(start.x), roundf(start.y), roundf(start.z));
+
+
+
+                    float3 newcast = cast + start;
+
+
+                    if (mainworld.isblock(newcast)) {
+
+                        cast = cast + make_float3(0, 0, 1);
+
+                        if (mainworld.isblock(cast)) {
+                            return;
+
+                        }
+                    }
+                    else {
+                        cast = newcast;
+                    }
+
                 }
 
-           
-               float3 start = (normalize(mainworld.player.playerpos-cast));
-               if (abs(start.x) > abs(start.z) && abs(start.x) > abs(start.y)) {
-
-                   start.z = 0;
-                   start.y = 0;
-               }
-
-               if (abs(start.z) > abs(start.x) && abs(start.z) > abs(start.y)) {
-
-                   start.x = 0;
-                   start.y = 0;
-               }
-
-               if (abs(start.y) > abs(start.z) && abs(start.y) > abs(start.x)) {
-
-                   start.z = 0;
-                   start.x = 0;
-               }
-
-               start = make_float3(roundf(start.x), roundf(start.y), roundf(start.z));
-              
 
 
-               cast = cast + start;
 
-            }
-            mainworld.change.registerchange(make_float4(cast, u));
-            mainworld.updatechunk(cast);
-            float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize));
-            float3 po =cast - make_float3(halfsize, halfsize, halfsize);
 
-       
-            if (cnot(getpos(po + make_float3(0, 0, 2)), pos)) {
-                mainworld.updatechunk(cast + make_float3(0, 0, 2));
+                mainworld.change.registerchange(make_float4(cast, u));
+                mainworld.updatechunk(cast);
+                float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize));
+                float3 po = cast - make_float3(halfsize, halfsize, halfsize);
 
-         }
 
-            if (cnot(getpos(po + make_float3(0, 0, -2)), pos)) {
-                mainworld.updatechunk(cast + make_float3(0, 0, -2));
+                if (cnot(getpos(po + make_float3(0, 0, 2)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(0, 0, 2));
 
-            }
-       
+                }
 
-            if (cnot(getpos(po + make_float3(0, 2, 0)), pos)) {
-                mainworld.updatechunk(cast + make_float3(0, 2, 0));
+                if (cnot(getpos(po + make_float3(0, 0, -2)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(0, 0, -2));
+
+                }
+
+
+                if (cnot(getpos(po + make_float3(0, 2, 0)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(0, 2, 0));
+
+                }
+
+                if (cnot(getpos(po + make_float3(0, -2, 0)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(0, -2, 0));
+
+                }
+
+                if (cnot(getpos(po + make_float3(2, 0, 0)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(2, 0, 0));
+
+                }
+
+                if (cnot(getpos(po + make_float3(-2, 0, 0)), pos)) {
+                    mainworld.updatechunk(cast + make_float3(-2, 0, 0));
+
+                }
+
+
+
 
             }
+        }
+        if (button == GLFW_MOUSE_BUTTON_4) {
 
-            if (cnot(getpos(po + make_float3(0, -2, 0)), pos)) {
-                mainworld.updatechunk(cast + make_float3(0, -2, 0));
+            selectedblock -= 1;
+            std::cout << "Selected block: " << selectedblock << " \n";
+        }
 
-            }
+        if (button == GLFW_MOUSE_BUTTON_5) {
 
-            if (cnot(getpos(po + make_float3(2, 0, 0)), pos)) {
-                mainworld.updatechunk(cast + make_float3(2, 0, 0));
-
-            }
-
-            if (cnot(getpos(po + make_float3(-2, 0, 0)), pos)) {
-                mainworld.updatechunk(cast + make_float3(-2, 0, 0));
-
-            }
-
-         
-          
-
+            selectedblock += 1;
+            std::cout << "Selected block: " << selectedblock << " \n";
         }
       
     }
@@ -1147,10 +1181,7 @@ int main(int argc, char* argv[])
         //
         // accel handling
         //
-        OptixTraversableHandle gas_handle;
-        CUdeviceptr            d_gas_output_buffer;
-
-
+     
         //
         // Create module
         //
@@ -1351,11 +1382,11 @@ int main(int argc, char* argv[])
 
 
 
-        //
+        
      
-        int i = 0;
+      
 
-        GLFWwindow* window = sutil::initUI("Minecraft 3", width, height);
+        GLFWwindow* window = sutil::initUI("OptixCraft", width, height);
     
        
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -1364,9 +1395,9 @@ int main(int argc, char* argv[])
       
 
 
-        {
+        
 
-
+        //set up output
             sutil::CUDAOutputBuffer<uchar4> output_buffer(
                 output_buffer_type,
                 width,
@@ -1380,9 +1411,10 @@ int main(int argc, char* argv[])
             output_buffer.setStream(stream);
             sutil::GLDisplay gl_display;
 
-            std::chrono::duration<double> state_update_time(0.0);
-            std::chrono::duration<double> render_time(0.0);
-            std::chrono::duration<double> display_time(0.0);
+            OptixTraversableHandle gas_handle;
+                CUdeviceptr            d_gas_output_buffer;
+
+
             OptixAccelBuildOptions accel_options = {};
             accel_options.buildFlags = OPTIX_BUILD_FLAG_NONE;
             accel_options.operation = OPTIX_BUILD_OPERATION_BUILD;
@@ -1394,10 +1426,15 @@ int main(int argc, char* argv[])
             triangle_input.triangleArray.flags = triangle_input_flags;
             triangle_input.triangleArray.numSbtRecords = 1;
 
+
+
+
+
+
+
+
             std::thread threader(chunkthread);
 
-
-           //     mainworld.addchunk({ 0,0,0 });
 
 
 
@@ -1429,29 +1466,13 @@ int main(int argc, char* argv[])
             
 
             mainworld.verts.updatenew();
-            // Use default options for simplicity.  In a real use case we would want to
-            // enable compaction, etc
-
-            // Triangle build input: simple list of three vertices
-
-
-            size_t vertices_size;
-            CUdeviceptr d_vertices = 0;
-
-
-            OptixAccelBufferSizes gas_buffer_sizes;
-
-            CUdeviceptr d_temp_buffer_gas;
+       
 
 
 
-            // We can now free the scratch space buffer used during build and the vertex
-            // inputs, since they are not needed by our trivial shading method
 
-            CUdeviceptr d_param;
-            Params params;
 
-            CUdeviceptr  d_uvs = 0;
+        
 
 
 
@@ -1459,16 +1480,20 @@ int main(int argc, char* argv[])
           
             auto t0 = std::chrono::steady_clock::now();
             auto t1 = std::chrono::steady_clock::now();
+            std::chrono::duration<double> state_update_time(0.0);
+            std::chrono::duration<double> render_time(0.0);
+            std::chrono::duration<double> display_time(0.0);
+            clock_t start = clock();
+            clock_t nowt;
+            float delta = 0;
+
+
+
             cam.setLookat({ 10,0,0 });
-
-
-
-
-
             cam.setUp({ 0.0f, 0.0f, 3.0f });
             cam.setFovY(45.0f);
             cam.setAspectRatio((float)width / (float)height);
-
+                   
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
             trackball.setCamera(&cam);
@@ -1483,79 +1508,118 @@ int main(int argc, char* argv[])
             trackball.reinitOrientationFromCamera();
             trackball.setGimbalLock(true);
             trackball.setViewMode(sutil::Trackball::EyeFixed);
-
             trackball.startTracking(static_cast<int>(xpos), static_cast<int>(ypos));
-            clock_t start = clock();
-            clock_t nowt;
-            float3 now = getpos(mainworld.player.playerpos);
 
 
 
-
-
-
-
-
-
-
-
-
+           
+            size_t vertices_size;
+            size_t uvs_size;
+            CUdeviceptr d_vertices = 0;
+            OptixAccelBufferSizes gas_buffer_sizes;
+            CUdeviceptr d_temp_buffer_gas;
+            CUdeviceptr d_param;
+            Params params;
+            CUdeviceptr  d_uvs = 0;
 
 
             // Create texture object
 
             cudaTextureDesc* tex_desc = {};
 
+
+       
+
             params.tex = sutil::loadTexture("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.3.0/SDK/build/bin/Debug/game.ppm", { 0,0,0 }, tex_desc).texture;
-
-
-
-
 
             std::cout << "tex loaded";
 
 
 
 
-            size_t uvs_size;
+
+        
 
 
-            float delta = 0;
-            //    std::cout << cam.lookat().x;
+
+
+
+
+        
+
+
+
+          
+
+
+         
+            float3 now = getpos(mainworld.player.playerpos);
+            int oldsize = 0;
+            bool first = true;
             do
             {
+
+                //update clocks
                 nowt = clock();
                 delta = nowt - start;
-
                 start = nowt;
-
                 t0 = std::chrono::steady_clock::now();
 
 
+                
 
+
+                //update player
                 //switch from raycastto basic check of blocks below player
                 //add physic and jump
-            
+         
+                mainworld.player.update(delta);
              
+                    
 
-                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2.5))) {
 
-                    mainworld.player.playerpos.z += 0.05;
+                if (glfwGetKey(window, GLFW_KEY_W))
+                {
+                    float3 dir = normalize(mainworld.player.playerpos - mainworld.player.moveto);
 
+                    if (shift) {
+                        mainworld.player.playerpos.x -= dir.x/40 * delta;
+                        mainworld.player.playerpos.y -= dir.y/40 * delta;
+                    }
+                    else {
+                        mainworld.player.playerpos.x -= dir.x / 100 * delta;
+                        mainworld.player.playerpos.y -= dir.y / 100 * delta;
+
+                    }
+
+                }
+                if (glfwGetKey(window, GLFW_KEY_S))
+                {
+
+                    float3 dir = normalize(mainworld.player.playerpos - mainworld.player.moveto);
+                    mainworld.player.playerpos.x += dir.x / 100 * delta;
+                    mainworld.player.playerpos.y += dir.y / 100 * delta;
+                }
+
+
+
+
+                
+                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2.1))) {
+
+                    mainworld.player.vz = 0;
+
+                }
+                else {
+
+                    mainworld.player.vz += -0.0001;
                 }
                 if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2))) {
 
                     mainworld.player.playerpos.z += 0.1;
 
                 }
-                if (!jumping) {
-                    mainworld.player.playerpos.z -= 0.05;
-
-
-
-
-
-                }
+               
 
 
 
@@ -1575,7 +1639,7 @@ int main(int argc, char* argv[])
 
 
 
-
+                //update world
                 canedit = false;
 
 
@@ -1627,15 +1691,26 @@ int main(int argc, char* argv[])
               
                 mainworld.verts.updatenew();
 
-                // do stuff here
-            
+             
 
-                // mainworld.addchunk({ 0,1,(-i / 1000.01f) });
+
+
+
+
 
                  //rebuild
+                
+                if(true){
+                   if(first == false) {
+                        
+                       
+                    }
+                   first == true;
 
-                {
-                  
+                   
+                   oldsize = mainworld.verts.vertices.size();
+
+
                     vertices_size = sizeof(float3) * mainworld.verts.vertices.size();
                     d_vertices = 0;
                     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_vertices), vertices_size));
@@ -1704,7 +1779,7 @@ int main(int argc, char* argv[])
                     // inputs, since they are not needed by our trivial shading method
                     CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_temp_buffer_gas)));
                 
-
+                 
 
 
 
@@ -1715,60 +1790,42 @@ int main(int argc, char* argv[])
                 canedit = true;
 
 
-
-
-
-
-
-
-
-
-
-
-                i++;
-
+                //mouse
+                cam.setEye(mainworld.player.playerpos);
                 glfwPollEvents();
-
-
-                //    mainworld.addchunk({ 0,1,i/1000.01f });
-
-
-
-
+                glfwGetCursorPos(window, &xpos, &ypos);
+                trackball.updateTracking(static_cast<int>(xpos), static_cast<int>(ypos), width, height);
+                mainworld.player.moveto = cam.lookat();
+                cam.UVWFrame(params.cam_u, params.cam_v, params.cam_w);
 
 
 
 
 
+            
 
+              
 
-
-                  //  cam.setLookat({ 0,0,0 });
-                    //cam.setDirection(make_float3(radians(xpos/1000), radians(-ypos / 1000), radians(1)));
-
-
+                //clock
                 t1 = std::chrono::steady_clock::now();
                 state_update_time += t1 - t0;
                 t0 = t1;
-                cam.setEye(mainworld.player.playerpos);
-                glfwGetCursorPos(window, &xpos, &ypos);
+               
 
-                trackball.updateTracking(static_cast<int>(xpos), static_cast<int>(ypos), width, height);
+         
 
 
-                mainworld.player.moveto = cam.lookat();
+              //update params
                 params.verts = reinterpret_cast<float3*>(d_vertices);
                 params.uvs = reinterpret_cast<float4*>(d_uvs);
                 params.image = output_buffer.map();
                 params.image_width = width;
                 params.image_height = height;
+
+                params.samples = MSAA;
                 params.handle = gas_handle;
                 params.cam_eye = cam.eye();
                 params.playerpos = mainworld.player.playerpos;
-
-                cam.UVWFrame(params.cam_u, params.cam_v, params.cam_w);
-
-
                 CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_param), sizeof(Params)));
                 CUDA_CHECK(cudaMemcpy(
                     reinterpret_cast<void*>(d_param),
@@ -1776,33 +1833,43 @@ int main(int argc, char* argv[])
                     cudaMemcpyHostToDevice
                 ));
 
-
+                //launch
                 OPTIX_CHECK(optixLaunch(pipeline, stream, d_param, sizeof(Params), &sbt, width, height, /*depth=*/1));
+
+
+
+                //free
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_gas_output_buffer)));
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_vertices)));
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_uvs)));
                 output_buffer.unmap();
                 CUDA_SYNC_CHECK();
 
+
+
+                //final time
                 t1 = std::chrono::steady_clock::now();
                 render_time += t1 - t0;
                 t0 = t1;
 
                 displaySubframe(output_buffer, gl_display, window);
+              
+
                 t1 = std::chrono::steady_clock::now();
                 display_time += t1 - t0;
-
                sutil::displayStats(state_update_time, render_time, display_time);
+               glfwSwapBuffers(window);
            //    std::cout << mainworld.verts.vertices.size() << "\n";
 
-                glfwSwapBuffers(window);
+           
+
 
               
             } while (!glfwWindowShouldClose(window));
             CUDA_SYNC_CHECK();
             threader.join();
 
-        }
+        
 
         sutil::cleanupUI(window);
         //

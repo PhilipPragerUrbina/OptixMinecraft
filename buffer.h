@@ -18,7 +18,7 @@ struct Params
     OptixTraversableHandle handle;
   
     uchar4* frame_buffer;
-
+    int samples;
   
     float3 playerpos;
     float3* verts;

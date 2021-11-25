@@ -226,7 +226,7 @@ extern "C" __global__ void __raygen__rg()
 
     float3 result = make_float3(0.0f);
 
-    int samples = 2;
+    int samples = params.samples;
     int i = samples;
     do
     {
@@ -431,7 +431,35 @@ extern "C" __global__ void __closesthit__ch()
 
 
 
+        if (mat == 6) {
 
+         //   if (col.x < 0.5) {
+
+         //   }
+
+
+                col = { 0.9,0.9,0.9 };
+                bool inorout = get_face_normal(ray_dir, N);
+                float ir = 1.5f;
+                float refraction_ratio = inorout ? (1.0 / ir) : ir;
+                float cos_theta = min(dot(normalize(ray_dir) * make_float3(-1), N), 1.0);
+                float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+                bool cannot_refract = (refraction_ratio * sin_theta) > 1.0;
+                float3 reflected;
+                if (cannot_refract || reflectance(cos_theta, refraction_ratio) > z1) {
+                    reflected = reflect(normalize(ray_dir), N);
+
+
+                }
+
+                else {
+
+                    reflected = refract(normalize(ray_dir), N, refraction_ratio);
+                }
+
+                prd->direction = reflected;
+            
+        }
 
 
 
