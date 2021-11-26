@@ -298,12 +298,12 @@ extern "C" __global__ void __miss__ms()
    // }
   
 
-       float3 ray_dir = optixGetWorldRayDirection();
+   //    float3 ray_dir = optixGetWorldRayDirection();
 
-    if (ray_dir.z < -0.05 ) {
+ //   if (ray_dir.z < -0.05 ) {
       
-        prd->radiance = make_float3(0, 0, 0);
-    }
+  //      prd->radiance = make_float3(0, 0, 0);
+ //   }
 
     //debug override
  //   prd->radiance = {0.01,0.01,0.01};
@@ -505,8 +505,9 @@ extern "C" __global__ void __closesthit__ch()
     
         if (distancef(params.playerpos, P) > 80) {
 
-
-            prd->radiance = col * make_float3(0.3f);
+            float distdiv = max((distancef(params.playerpos, P)-80)*2,1.0f);
+            col = col * distdiv;
+            prd->radiance = make_float3(min(col.x , 1.0f), min(col.y, 1.0f), min(col.z, 1.0f)) * make_float3(0.3f);
             prd->attenuation = { 1,1,1 };
             prd->done = true;
         }

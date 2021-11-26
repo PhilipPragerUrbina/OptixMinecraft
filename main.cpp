@@ -222,6 +222,12 @@ void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, 
         x = 0;
     }
 
+    if (mat == 5) {
+        x = 18;
+
+        y = 14;
+    }
+
     //2
     if (mat == 1) {
         x = 15;
@@ -579,20 +585,34 @@ void chunk::Generate(Vertexmanager& verts) {
                     int mat = 0;
 
 
-                    //1 for reflective zero for diffuse
+                    int glass = 7;
+                    bool isglass =false;
+                    if (blocks[getindex(x + 1, y + 1, z + 1)] == glass) {
 
+                        isglass = true;
+                    }
 
-                    if (blocks[getindex(x + 1, y + 1, z + 1)] == 0)
+                    if (blocks[getindex(x + 1, y + 1, z + 1)] == 0 || isglass )
                     {
 
-                        if (blocks[getindex(x + 2, y + 1, z + 1)] > 0)
+                        if (blocks[getindex(x + 2, y + 1, z + 1)] > 0 )
                         {
+
+                           
 
                             mat = blocks[getindex(x + 2, y + 1, z + 1)] - 1;
 
-                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position,1);
+                            if (isglass && mat + 1 == glass) {
 
 
+                            }
+                            else {
+
+
+
+                                verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position, 1);
+
+                            }
 
 
 
@@ -600,10 +620,15 @@ void chunk::Generate(Vertexmanager& verts) {
                         if (blocks[getindex(x, y + 1, z + 1)] > 0)
                         {
                             mat = blocks[getindex(x, y + 1, z + 1)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position,2);
+                            if (isglass && mat + 1 == glass) {
 
 
+                            }
+                            else {
+                                verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position, 2);
 
+
+                            }
 
 
 
@@ -614,12 +639,16 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
 
                             mat = blocks[getindex(x + 1, y, z + 1)] - 1;
+                            if (isglass && mat + 1 == glass) {
 
 
-                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, mat, position,4);
+                            }
+                            else {
+
+                                verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, mat, position, 4);
 
 
-
+                            }
                          
 
 
@@ -631,12 +660,16 @@ void chunk::Generate(Vertexmanager& verts) {
                         if (blocks[getindex(x + 1, y + 2, z + 1)] > 0)
                         {
                             mat = blocks[getindex(x + 1, y + 2, z + 1)] - 1;
-
-                            verts.addplane(make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position,3);
-
+                            if (isglass && mat + 1 == glass) {
 
 
+                            }
+                            else {
+                                verts.addplane(make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position, 3);
 
+
+
+                            }
 
 
                         }
@@ -646,10 +679,15 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
 
                             mat = blocks[getindex(x + 1, y + 1, z)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position,6);
+                            if (isglass && mat + 1 == glass) {
 
 
+                            }
+                            else {
+                                verts.addplane(make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position, 6);
 
+
+                            }
 
 
                         }
@@ -657,9 +695,14 @@ void chunk::Generate(Vertexmanager& verts) {
                         {
 
                             mat = blocks[getindex(x + 1, y + 1, z + 2)] - 1;
-                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position,5);
+                            if (isglass && mat + 1 == glass) {
 
 
+                            }
+                            else {
+                                verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position, 5);
+
+                            }
                         }
 
 
@@ -760,10 +803,15 @@ float world::getBlock(float nx, float ny, float nz) {
 
     if (nz < r * 6) {
 
-        if (nz < r*6-10) {
-            return 5;
+        if (nz < r * 6 - 1) {
+            if (nz < r * 6 - 10) {
+                return 5;
+
+            }
+            return 6;
 
         }
+     
         return 1;
 
 
@@ -1860,8 +1908,21 @@ int main(int argc, char* argv[])
                sutil::displayStats(state_update_time, render_time, display_time);
                glfwSwapBuffers(window);
            //    std::cout << mainworld.verts.vertices.size() << "\n";
+               /*
+               saving screenshots, kind of useless wit ppm format
+               if (false) {
 
-           
+                   sutil::ImageBuffer buffer;
+                   buffer.data = output_buffer.getHostPointer();
+                   buffer.width = output_buffer.width();
+                   buffer.height = output_buffer.height();
+                   buffer.pixel_format = sutil::BufferImageFormat::UNSIGNED_BYTE4;
+
+                   sutil::saveImage("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.3.0/SDK/build/bin/Debug/screenshot.ppm", buffer, false);
+
+                   first = false;
+               }
+            */
 
 
               
