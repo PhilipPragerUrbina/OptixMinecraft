@@ -411,7 +411,15 @@ extern "C" __global__ void __closesthit__ch()
      //   prd->direction = normalize(w_in);
         
 
+        if (mat == -2) {
+            if (col.x > 0.9) {
+               // col = { 0,0.5,0 };
+           //     prd->radiance = { 1,1,1 };
+                prd->direction = ray_dir;
+            }
 
+
+        }
       
 
 
@@ -428,7 +436,7 @@ extern "C" __global__ void __closesthit__ch()
 
             prd->direction = reflected;
         }
-
+       
 
 
         if (mat == 6) {

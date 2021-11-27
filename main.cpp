@@ -247,6 +247,14 @@ void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, 
 
         y = 14;
     }
+
+    if (mat == -2) {
+
+        x = 10;
+
+        y = 11;
+    }
+
     float sx = 32;
     float sy = 16;
     addtri(a, b, c, { x / sx,(1.0f + y) / sy,mat,0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
@@ -393,7 +401,76 @@ void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
 void Vertexmanager::removechunk(float3 po) {
 
     float3 pos = getpos(po - make_float3(halfsize, halfsize, halfsize));
-  
+
+    /*
+    int start = 0;
+    int end = 10;
+
+
+
+
+    bool in = false;
+    int e = 0;
+
+    bool done = false;
+    for (float3 value : index) {
+        if (done == false) {
+
+
+
+
+
+
+            if (value.x == pos.x && value.y == pos.y && value.z == pos.z) {
+                if (in == false) {
+
+                    in = true;
+                    start = e;
+                    end = e + 3;
+
+                }
+                else {
+
+
+                  
+                }
+
+            }
+            else {
+                if (in == true) {
+
+                    end = e;
+
+                    in = false;
+                    done = true;
+
+
+
+                }
+
+
+            }
+
+            e++;
+
+        }
+
+    }
+
+        index.erase(index.begin() + start, index.begin() + end);
+        vertices.erase(vertices.begin() + start, vertices.begin() + end);
+        uvs.erase(uvs.begin() + start, uvs.begin() + end);
+
+    std::cout << start << "   " << end << "\n";
+
+
+
+    */
+
+
+
+
+
 
 
     std::vector <float3> vertices2;
@@ -402,29 +479,142 @@ void Vertexmanager::removechunk(float3 po) {
 
 
     int isze = vertices.size();
-    vertices2.reserve(isze);
-    uvs2.reserve(isze);
-    index2.reserve(isze);
-    for (int i = 0; i < isze; i++)
-    {
-        if (index[i].x == pos.x && index[i].y == pos.y && index[i].z == pos.z) {
-          
+    vertices2 = vertices;
+    uvs2 = uvs;
+    index2 = index;
+    int start = 0;
+    int end = 10;
 
-        }
-        else {
-        
 
-            vertices2.push_back(vertices[i]);
-            uvs2.push_back(uvs[i]);
-            index2.push_back(index[i]);
+
+
+    bool in = false;
+    int e = 0;
+
+    bool done = false;
+    for (float3 value : index2) {
+        if (done == false) {
+
+
+
+
+
+
+            if (value.x == pos.x && value.y == pos.y && value.z == pos.z) {
+                if (in == false) {
+
+                    in = true;
+                    start = e;
+
+
+                }
+
+
+                end = e + 1;
+
+
+
+            }
+            else {
+                if (in == true) {
+
+
+
+                    in = false;
+                    done = true;
+
+
+
+                }
+
+
+            }
+
+            e++;
+
         }
 
     }
 
-    vertices = vertices2;
-    uvs = uvs2;
-    index = index2;
- 
+
+   
+    int num = abs(start - end);
+
+  
+
+
+
+    if (num > 0) {
+        if (num % 3 != 0) {
+
+            end--;
+            num--;
+            if (num % 3 != 0) {
+
+                end--;
+                num--;
+            }
+
+        }
+        index2.erase(index2.begin() + start, index2.begin() + end);
+        vertices2.erase(vertices2.begin() + start, vertices2.begin() + end);
+        uvs2.erase(uvs2.begin() + start, uvs2.begin() + end);
+        Sleep(10);
+
+        vertices = vertices2;
+        uvs = uvs2;
+        index = index2;
+    }
+
+
+
+
+
+
+    /*
+
+        std::vector <float3> vertices2;
+        std::vector <float4>uvs2;
+        std::vector <float3>index2;
+
+
+        int isze = vertices.size();
+        vertices2.reserve(isze);
+        uvs2.reserve(isze);
+        index2.reserve(isze);
+        for (int i = 0; i < isze; i++)
+        {
+            if (index[i].x == pos.x && index[i].y == pos.y && index[i].z == pos.z) {
+
+
+            }
+            else {
+
+
+                vertices2.push_back(vertices[i]);
+                uvs2.push_back(uvs[i]);
+                index2.push_back(index[i]);
+            }
+
+        }
+
+        vertices = vertices2;
+        uvs = uvs2;
+        index = index2;
+
+
+        */
+
+
+
+
+
+        
+
+    
+
+
+
 
 
 }
@@ -451,7 +641,7 @@ void changemanager::registerchange(float4 w) {
 
 float changemanager::getchange(float3 w) {
     if (changes.count(w) == 0) {
-        return -1;
+        return -69;
     }
     else {
         return changes[w];
@@ -586,15 +776,27 @@ void chunk::Generate(Vertexmanager& verts) {
 
 
                     int glass = 7;
+                    int grass = -1;
                     bool isglass =false;
                     if (blocks[getindex(x + 1, y + 1, z + 1)] == glass) {
 
                         isglass = true;
                     }
 
-                    if (blocks[getindex(x + 1, y + 1, z + 1)] == 0 || isglass )
+                  
+
+                    if (blocks[getindex(x + 1, y + 1, z + 1)] <= 0 || isglass )
                     {
 
+
+
+                        if (blocks[getindex(x + 1, y + 1, z + 1)] == grass) {
+
+                            mat = -2;
+                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position, 1);
+                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position, 2);
+                        }
+                      
                         if (blocks[getindex(x + 2, y + 1, z + 1)] > 0 )
                         {
 
@@ -700,7 +902,7 @@ void chunk::Generate(Vertexmanager& verts) {
 
                             }
                             else {
-                                verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position, 5);
+verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, mat, position, 5);
 
                             }
                         }
@@ -735,7 +937,7 @@ void world::updatechunk(float3 pos) {
 
 
 }
-void world::quechunk(float3 pos ) {
+void world::quechunk(float3 pos) {
     if (std::find_if(chunks.begin(), chunks.end(), compare(pos)) != chunks.end()) {
 
 
@@ -779,7 +981,7 @@ bool world::isblock(float3 start) {
 
     float3 blockpos = make_float3(round(start.x), round(start.y), round(start.z));
 
-    if (getBlock(blockpos.x, blockpos.y, blockpos.z ) > 0) {
+    if (getBlock(blockpos.x, blockpos.y, blockpos.z) > 0) {
 
         return true;
     }
@@ -791,16 +993,54 @@ bool world::isblock(float3 start) {
 }
 
 float world::getBlock(float nx, float ny, float nz) {
-    float r = worldnoise.GetNoise((float)nx, (float)ny);
+  
     // float r3d = noise.GetNoise((float)nx*10, (float)ny * 10, (float)nz * 10);
       //    int height = rand() % 10;
 
     float changes = change.getchange(make_float3(nx, ny, nz));
-    if (changes > -1) {
+    if (changes > -69) {
         return changes;
 
     }
 
+
+    /*
+    if (worldnoise.GetNoise((float)nx / 5, (float)ny / 5) > 0.5f){
+    if (nz < r * 20) {
+
+        if (nz < r * 20 - 1) {
+            if (nz < r * 20 - 10) {
+                return 5;
+
+            }
+            return 6;
+
+        }
+
+        return 1;
+
+
+
+
+
+
+    }
+
+    }
+
+    */
+    float r = worldnoise.GetNoise((float)nx, (float)ny);
+
+    if (nz < (r * 6)+1 && nz>r*6 ) {
+
+
+        srand(nx * ny  + nx + ny );
+        if (rand() % 100 > 98) {
+            return -1;
+
+        }
+
+    }
     if (nz < r * 6) {
 
         if (nz < r * 6 - 1) {
@@ -1106,6 +1346,11 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
 
 
                 mainworld.change.registerchange(make_float4(cast, u));
+                if (mainworld.getBlock(cast.x, cast.y, cast.z + 1) == -1) {
+                    mainworld.change.registerchange(make_float4(cast+make_float3(0,0,1), 0));
+
+                }
+
                 mainworld.updatechunk(cast);
                 float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize));
                 float3 po = cast - make_float3(halfsize, halfsize, halfsize);
@@ -1664,7 +1909,7 @@ int main(int argc, char* argv[])
                 }
                 if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2))) {
 
-                    mainworld.player.playerpos.z += 0.1;
+                    mainworld.player.playerpos.z += 0.01*delta;
 
                 }
                
