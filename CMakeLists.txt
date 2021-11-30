@@ -4,6 +4,7 @@ OPTIX_add_sample_executable( minecraft3 target_name
   main.cpp
   buffer.h
   FastNoiseLite.h
+  ogt_vox.h
   OPTIONS -rdc true
   )
 

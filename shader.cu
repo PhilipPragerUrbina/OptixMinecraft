@@ -29,7 +29,7 @@ struct RadiancePRD
     float3       origin;
     float3       direction;
     unsigned int seed;
-    int          countEmitted;
+ 
     int          done;
     int          pad;
 };
@@ -172,37 +172,13 @@ static __forceinline__ __device__ void traceRadiance(
         0.0f,                // rayTime
         OptixVisibilityMask(1),
         OPTIX_RAY_FLAG_NONE,
-        RAY_TYPE_RADIANCE,        // SBT offset
-        RAY_TYPE_COUNT,           // SBT stride
-        RAY_TYPE_RADIANCE,        // missSBTIndex
+        0,        // SBT offset
+        1,           // SBT stride
+        0,        // missSBTIndex
         u0, u1);
 }
 
 
-static __forceinline__ __device__ bool traceOcclusion(
-    OptixTraversableHandle handle,
-    float3                 ray_origin,
-    float3                 ray_direction,
-    float                  tmin,
-    float                  tmax
-)
-{
-    unsigned int occluded = 0u;
-    optixTrace(
-        handle,
-        ray_origin,
-        ray_direction,
-        tmin,
-        tmax,
-        0.0f,                    // rayTime
-        OptixVisibilityMask(1),
-        OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT,
-        RAY_TYPE_OCCLUSION,      // SBT offset
-        RAY_TYPE_COUNT,          // SBT stride
-        RAY_TYPE_OCCLUSION,      // missSBTIndex
-        occluded);
-    return occluded;
-}
 
 
 //------------------------------------------------------------------------------
@@ -245,7 +221,7 @@ extern "C" __global__ void __raygen__rg()
         prd.emitted = make_float3(0.f);
         prd.radiance = make_float3(0.f);
         prd.attenuation = make_float3(1.f);
-        prd.countEmitted = true;
+    
         prd.done = false;
         prd.seed = seed;
 
@@ -509,7 +485,7 @@ extern "C" __global__ void __closesthit__ch()
 
 
         prd->attenuation *= col ;
-        prd->countEmitted = false;
+   
     
         if (distancef(params.playerpos, P) > 80) {
 

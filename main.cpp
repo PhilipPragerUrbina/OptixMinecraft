@@ -24,6 +24,7 @@
 
 //types
 #include <map>
+
 #include <array>
 #include <vector>
 #include <string>
@@ -47,7 +48,15 @@
 #include <algorithm>
 #include <atomic>
 
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
 
+
+//importer 
+#define OGT_VOX_IMPLEMENTATION
+#include "ogt_vox.h"
+
+//settings
 int viewdist = 6;
 const int size = 32;
 
@@ -57,12 +66,20 @@ int MSAA = 2;
 
 
 
-
+//globals
 const int halfsize = size / 2;
 
 sutil::Camera cam;
 std::mutex lock;
 
+
+//vertex
+struct vertexdata {
+    float4 uv;
+    float3 index;
+
+
+};
 
 //sbt record
 template <typename T>
@@ -75,6 +92,48 @@ struct SbtRecord
 typedef SbtRecord<RayGenData>     RayGenSbtRecord;
 typedef SbtRecord<MissData>       MissSbtRecord;
 typedef SbtRecord<HitGroupData>   HitGroupSbtRecord;
+
+//loader
+
+const ogt_vox_scene* load_vox_scene(const char* filename, uint32_t scene_read_flags = 0)
+{
+    // open the file
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+    FILE* fp;
+    if (0 != fopen_s(&fp, filename, "rb"))
+        fp = 0;
+#else
+    FILE* fp = fopen(filename, "rb");
+#endif
+    if (!fp)
+        return NULL;
+
+    // get the buffer size which matches the size of the file
+    fseek(fp, 0, SEEK_END);
+    uint32_t buffer_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    // load the file into a memory buffer
+    uint8_t* buffer = new uint8_t[buffer_size];
+    fread(buffer, buffer_size, 1, fp);
+    fclose(fp);
+
+    // construct the scene from the buffer
+    const ogt_vox_scene* scene = ogt_vox_read_scene_with_flags(buffer, buffer_size, scene_read_flags);
+
+    // the buffer can be safely deleted once the scene is instantiated.
+    delete[] buffer;
+
+    return scene;
+}
+
+
+
+
+
+
+
+
 
 //utitlity functions:
 
@@ -627,10 +686,34 @@ public:
     void registerchange(float4 w);
     std::map<float3, int, Float3Compare> changes;
     float getchange(float3 w);
+    void load_model(const ogt_vox_model* model);
 };
 
 
 
+void changemanager::load_model(const ogt_vox_model* model)
+{
+ 
+    uint32_t voxel_index = 0;
+    for (uint32_t z = 0; z < model->size_z; z++) {
+        for (uint32_t y = 0; y < model->size_y; y++) {
+            for (uint32_t x = 0; x < model->size_x; x++, voxel_index++) {
+                // if color index == 0, this voxel is empty, otherwise it is solid.
+                uint32_t color_index = model->voxel_data[voxel_index];
+                bool is_voxel_solid = (color_index != 0);
+                if (is_voxel_solid) {
+                    registerchange(make_float4(x, y, z, 2));
+
+                }
+                else {
+
+
+                }
+            }
+        }
+    }
+
+}
 
 
 void changemanager::registerchange(float4 w) {
@@ -703,6 +786,7 @@ public:
     bool isblock(float3 start);
     void quechunk(float3 pos );
     void updatechunk(float3 pos);
+  
 };
 
 world mainworld;
@@ -793,8 +877,8 @@ void chunk::Generate(Vertexmanager& verts) {
                         if (blocks[getindex(x + 1, y + 1, z + 1)] == grass) {
 
                             mat = -2;
-                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.5f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.5f) + pos, mat, position, 1);
-                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.5f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.5f) + pos, mat, position, 2);
+                            verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.49f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.49f) + pos, mat, position, 1);
+                            verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.49f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.49f) + pos, mat, position, 2);
                         }
                       
                         if (blocks[getindex(x + 2, y + 1, z + 1)] > 0 )
@@ -962,9 +1046,9 @@ void world::addchunk(float3 pos) {
     c.position = pos;
 
     c.Generate(verts);
-    lock.lock();
+  
     chunks.push_back(pos);
-    lock.unlock();
+ 
 
 
     /*    if (std::find_if(chunks.begin(), chunks.end(), compare(pos)) != chunks.end() || distance(playerpos, pos) > size * viewdist) {
@@ -998,11 +1082,18 @@ float world::getBlock(float nx, float ny, float nz) {
       //    int height = rand() % 10;
 
     float changes = change.getchange(make_float3(nx, ny, nz));
+
+
+  
     if (changes > -69) {
         return changes;
 
     }
+  //  if (distance(make_float3(100, 100, 50), make_float3(nx, ny, nz)) < 90) {
 
+    //    return 5;
+
+ //   }
 
     /*
     if (worldnoise.GetNoise((float)nx / 5, (float)ny / 5) > 0.5f){
@@ -1031,16 +1122,7 @@ float world::getBlock(float nx, float ny, float nz) {
     */
     float r = worldnoise.GetNoise((float)nx, (float)ny);
 
-    if (nz < (r * 6)+1 && nz>r*6 ) {
-
-
-        srand(nx * ny  + nx + ny );
-        if (rand() % 100 > 98) {
-            return -1;
-
-        }
-
-    }
+   
     if (nz < r * 6) {
 
         if (nz < r * 6 - 1) {
@@ -1060,7 +1142,17 @@ float world::getBlock(float nx, float ny, float nz) {
 
 
     }
-    else {
+     if (nz < (r * 6) + 1 && nz>r * 6) {
+
+
+        srand(nx * ny + nx + ny);
+        if (rand() % 100 > 98) {
+            return -1;
+
+        }
+
+    }
+  
 
 
 
@@ -1068,7 +1160,7 @@ float world::getBlock(float nx, float ny, float nz) {
 
 
 
-    }
+    
 
 
 }
@@ -1434,6 +1526,23 @@ int main(int argc, char* argv[])
  
 
 
+    std::string filename;
+    bool isfile = false;
+  
+
+    if (argc < 2)
+    {
+
+    
+
+
+    }
+    else
+    {
+        filename = argv[1];
+        std::cout << "Opening:" << filename << std::endl;
+        isfile = true;
+    }
    
    
   
@@ -1675,8 +1784,7 @@ int main(int argc, char* argv[])
 
 
 
-        
-     
+
       
 
         GLFWwindow* window = sutil::initUI("OptixCraft", width, height);
@@ -1715,13 +1823,16 @@ int main(int argc, char* argv[])
             OptixBuildInput triangle_input = {};
             triangle_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
             triangle_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-
+            triangle_input.triangleArray.vertexStrideInBytes = sizeof(float3);
             triangle_input.triangleArray.flags = triangle_input_flags;
             triangle_input.triangleArray.numSbtRecords = 1;
+           
 
+            if (isfile) {
+            
+                mainworld.change.load_model(load_vox_scene(filename.c_str())->models[0]);
 
-
-
+            }
 
 
 
@@ -1822,10 +1933,26 @@ int main(int argc, char* argv[])
 
 
        
+          if(std::experimental::filesystem::exists("game.ppm")){
 
-            params.tex = sutil::loadTexture("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.3.0/SDK/build/bin/Debug/game.ppm", { 0,0,0 }, tex_desc).texture;
 
-            std::cout << "tex loaded";
+
+
+                params.tex = sutil::loadTexture("game.ppm", { 0,0,0 }, tex_desc).texture;
+
+                std::cout << "tex loaded locally";
+
+              
+
+          }
+          else {
+              params.tex = sutil::loadTexture("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.3.0/SDK/build/bin/Debug/game.ppm", { 0,0,0 }, tex_desc).texture;
+
+              std::cout << "tex loaded from directory";
+
+          }
+           
+           
 
 
 
@@ -1898,7 +2025,7 @@ int main(int argc, char* argv[])
 
 
                 
-                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2.1))) {
+                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -1.51))) {
 
                     mainworld.player.vz = 0;
 
@@ -1907,7 +2034,7 @@ int main(int argc, char* argv[])
 
                     mainworld.player.vz += -0.0001;
                 }
-                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -2))) {
+                if (mainworld.isblock(mainworld.player.playerpos + make_float3(0, 0, -1.5))) {
 
                     mainworld.player.playerpos.z += 0.01*delta;
 
