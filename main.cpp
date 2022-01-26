@@ -50,8 +50,9 @@
 
 #define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
 #include <experimental/filesystem>
-
-
+#include "Player.h"
+#include "VertexManager.h"
+#include "changemanager.h"
 //importer 
 #define OGT_VOX_IMPLEMENTATION
 #include "ogt_vox.h"
@@ -70,7 +71,7 @@ int MSAA = 2;
 const int halfsize = size / 2;
 
 sutil::Camera cam;
-std::mutex lock;
+
 
 
 //vertex
@@ -120,10 +121,10 @@ const ogt_vox_scene* load_vox_scene(const char* filename, uint32_t scene_read_fl
 
     // construct the scene from the buffer
     const ogt_vox_scene* scene = ogt_vox_read_scene_with_flags(buffer, buffer_size, scene_read_flags);
-
+ 
     // the buffer can be safely deleted once the scene is instantiated.
     delete[] buffer;
-
+   
     return scene;
 }
 
@@ -134,624 +135,8 @@ const ogt_vox_scene* load_vox_scene(const char* filename, uint32_t scene_read_fl
 
 
 
-
-//utitlity functions:
-
-
-
-float distance(float3 a, float3 b)
-{
-    float d = sqrt(pow(b.x - a.x, 2) +
-        pow(b.y - a.y, 2) +
-        pow(b.z - a.z, 2) * 1.0);
-
-
-    return d;
-}
-float squaredistance(float3 a, float3 b)
-{
-    float x = abs(a.x - b.x);
-    float y = abs(a.y - b.y);
-    float z = abs(a.z - b.z);
-
-    return std::max(z, std::max(x, y));
-}
-bool Within3DManhattanDistance(float3 c1, float3 c2, float distance)
-{
-    float dx = abs(c2.x - c1.x);
-    float dy = abs(c2.y - c1.y);
-    float dz = abs(c2.z - c1.z);
-
-    if (dx > distance) return false; // too far in x direction
-    if (dy > distance) return false; // too far in y direction
-    if (dz > distance) return false; // too far in z direction
-
-    return true; // we're within the cube
-}
-float3 getpos(float3 where)
-{
-    where.x = roundf(where.x / size) * size;
-    where.y = roundf(where.y / size) * size;
-    where.z = roundf(where.z / size) * size;
-    return where;
-
-}
-struct Float3Compare
-{
-    bool operator() (const float3& lhs, const float3& rhs) const
-    {
-        return lhs.x < rhs.x
-            || (lhs.x == rhs.x && (lhs.y < rhs.y
-                || (lhs.y == rhs.y && lhs.z < rhs.z)));
-    }
-};
-
-struct compare
-{
-    float3 key;
-    compare(float3 const& i) : key(i) {}
-
-    bool operator()(float3 const& i) {
-        return (i.x == key.x && i.y == key.y && i.z == key.z);
-    }
-};
-float radians(float degrees)
-{
-    return degrees * M_PIf / 180.0f;
-}
-float degrees(float radians)
-{
-    return radians * M_1_PIf * 180.0f;
-}
-
-bool cnot(float3 a, float3 b) {
-
-    if (a.x == b.x && a.y == b.y && a.z == b.z) {
-
-        return false;
-    }
-    else {
-
-        return true;
-    }
-
-}
-
-int getindex(int x, int y, int z) {
-    return x + (size + 3) * (y + (size + 3) * z);
-
-}
-
-//classes
-//manager class
-class Vertexmanager {     
-public:           
-    std::vector<float3> vertices;
-    std::vector<float3> newvertices;
-
-    std::vector<float4> uvs;
-    std::vector<float4> newuvs;
-
-    std::vector<float3> index;
-    std::vector<float3> newindex;
-    void removechunk(float3 pos);
-    void cull(float3 pos, std::vector <float3> &chunks);
-  
-    void updatenew();
-    void add(float3 pos, float4 uvs, float3 i);
-    void addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc, float3 i);
-    void addplane(float3 a, float3 b, float3 c, float3 d, float mat, float3 i, int side);
-
-
-};
-
-
-
-void Vertexmanager::add(float3 pos, float4 uvs, float3 i) {
-    lock.lock();
-    newvertices.push_back(pos);
-    newuvs.push_back(uvs);
-    newindex.push_back(i);
-    lock.unlock();
-}
-
-void Vertexmanager::addtri(float3 a, float3 b, float3 c, float4 uva, float2 uvb, float2 uvc, float3 i) {
-    add(a, uva, i);
-    add(b, make_float4(uvb, 0, 0), i);
-    add(c, make_float4(uvc, 0, 0), i);
-}
-void Vertexmanager::addplane(float3 a, float3 d, float3 b, float3 c, float mat, float3 i, int side) {
-
-    float y = 15;
-
-
-    float x = 2;
-    if (side < 5) {
-        x = 3;
-
-    }
-    else if (side == 5) {
-
-        x = 18;
-
-        y = 14;
-    }
-
-    if (mat==4) {
-        x = 0;
-    }
-
-    if (mat == 5) {
-        x = 18;
-
-        y = 14;
-    }
-
-    //2
-    if (mat == 1) {
-        x = 15;
-        y = 12;
-    }
-    if (mat == 6) {
-
-        x = 24;
-
-        y = 11;
-    }
-
-
-    if (mat == 7) {
-
-        x = 21;
-
-        y = 14;
-    }
-
-    if (mat == -2) {
-
-        x = 10;
-
-        y = 11;
-    }
-
-    float sx = 32;
-    float sy = 16;
-    addtri(a, b, c, { x / sx,(1.0f + y) / sy,mat,0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
-    addtri(a, d, c, { (1.0f + x) / sx, y / sy, mat, 0 }, { x / sx,y / sy }, { (1.0f + x) / sx,(1.0f + y) / sy }, i);
-}
-void Vertexmanager::updatenew() {
-
-    /*
-    lock.lock();
-
-    while (newvertices.size() > 0) {
-
-
-
-        vertices.push_back(newvertices[0]);
-
-        newvertices.erase(newvertices.begin());
-
-
-        uvs.push_back(newuvs[0]);
-
-        newuvs.erase(newuvs.begin());
-
-
-        index.push_back(newindex[0]);
-
-        newindex.erase(newindex.begin());
-
-    }
-       lock.unlock();
-*/
-
-
-
-    if (newvertices.size() > 0) {
-        lock.lock();
-        int i = 0;
-        while (i < newvertices.size()) {
-
-
-
-            vertices.push_back(newvertices[i]);
-
-
-
-
-            uvs.push_back(newuvs[i]);
-
-
-
-
-            index.push_back(newindex[i]);
-
-
-            i++;
-        }
-
-
-
-
-        newvertices.clear();
-
-
-
-
-        newuvs.clear();
-
-
-
-
-        newindex.clear();
-        lock.unlock();
-    }
-
-}
-
-
-
-
-void Vertexmanager::cull(float3 pos, std::vector <float3>& chunks) {
-
-    pos = getpos(pos);
-
-    //check very third and if far away destroy two connect ones
-    /*
-    int i = 0;
-    while(i<vertices.size()/6) {
-
-        if (squaredistance(cpos, vertices[i * 3]) > viewdist * size + 0.1) {
-
-
-            vertices.erase(vertices.begin()+(i*3));
-            vertices.erase(vertices.begin() + (i * 3)+1);
-            vertices.erase(vertices.begin() + (i * 3) + 2);
-        }
-        else {
-
-
-            i++;
-        }
-    }
-
-
-    */
-
-
-    int numberdelc = 0;
-
-
-    for (float3 chunk : chunks) {
-
-        if (!Within3DManhattanDistance(pos, chunk, viewdist * size)) {
-            numberdelc++;
-
-        }
-
-
-
-    }
-
-
-    int numberdel = 0;
-
-
-    for (float3 value : index) {
-
-        if (!Within3DManhattanDistance(pos, value, viewdist * size)) {
-            numberdel++;
-
-        }
-
-
-
-    }
-   
-   chunks.erase(chunks.begin(),chunks.begin() + numberdelc);
-    index.erase(index.begin(), index.begin() + numberdel);
-    vertices.erase(vertices.begin(), vertices.begin() + numberdel);
-    uvs.erase(uvs.begin(), uvs.begin() + numberdel);
-
-
-}
-
-void Vertexmanager::removechunk(float3 po) {
-
-    float3 pos = getpos(po - make_float3(halfsize, halfsize, halfsize));
-
-    /*
-    int start = 0;
-    int end = 10;
-
-
-
-
-    bool in = false;
-    int e = 0;
-
-    bool done = false;
-    for (float3 value : index) {
-        if (done == false) {
-
-
-
-
-
-
-            if (value.x == pos.x && value.y == pos.y && value.z == pos.z) {
-                if (in == false) {
-
-                    in = true;
-                    start = e;
-                    end = e + 3;
-
-                }
-                else {
-
-
-                  
-                }
-
-            }
-            else {
-                if (in == true) {
-
-                    end = e;
-
-                    in = false;
-                    done = true;
-
-
-
-                }
-
-
-            }
-
-            e++;
-
-        }
-
-    }
-
-        index.erase(index.begin() + start, index.begin() + end);
-        vertices.erase(vertices.begin() + start, vertices.begin() + end);
-        uvs.erase(uvs.begin() + start, uvs.begin() + end);
-
-    std::cout << start << "   " << end << "\n";
-
-
-
-    */
-
-
-
-
-
-
-
-    std::vector <float3> vertices2;
-    std::vector <float4>uvs2;
-    std::vector <float3>index2;
-
-
-    int isze = vertices.size();
-    vertices2 = vertices;
-    uvs2 = uvs;
-    index2 = index;
-    int start = 0;
-    int end = 10;
-
-
-
-
-    bool in = false;
-    int e = 0;
-
-    bool done = false;
-    for (float3 value : index2) {
-        if (done == false) {
-
-
-
-
-
-
-            if (value.x == pos.x && value.y == pos.y && value.z == pos.z) {
-                if (in == false) {
-
-                    in = true;
-                    start = e;
-
-
-                }
-
-
-                end = e + 1;
-
-
-
-            }
-            else {
-                if (in == true) {
-
-
-
-                    in = false;
-                    done = true;
-
-
-
-                }
-
-
-            }
-
-            e++;
-
-        }
-
-    }
-
-
-   
-    int num = abs(start - end);
-
-  
-
-
-
-    if (num > 0) {
-        if (num % 3 != 0) {
-
-            end--;
-            num--;
-            if (num % 3 != 0) {
-
-                end--;
-                num--;
-            }
-
-        }
-        index2.erase(index2.begin() + start, index2.begin() + end);
-        vertices2.erase(vertices2.begin() + start, vertices2.begin() + end);
-        uvs2.erase(uvs2.begin() + start, uvs2.begin() + end);
-        Sleep(10);
-
-        vertices = vertices2;
-        uvs = uvs2;
-        index = index2;
-    }
-
-
-
-
-
-
-    /*
-
-        std::vector <float3> vertices2;
-        std::vector <float4>uvs2;
-        std::vector <float3>index2;
-
-
-        int isze = vertices.size();
-        vertices2.reserve(isze);
-        uvs2.reserve(isze);
-        index2.reserve(isze);
-        for (int i = 0; i < isze; i++)
-        {
-            if (index[i].x == pos.x && index[i].y == pos.y && index[i].z == pos.z) {
-
-
-            }
-            else {
-
-
-                vertices2.push_back(vertices[i]);
-                uvs2.push_back(uvs[i]);
-                index2.push_back(index[i]);
-            }
-
-        }
-
-        vertices = vertices2;
-        uvs = uvs2;
-        index = index2;
-
-
-        */
-
-
-
-
-
-        
-
-    
-
-
-
-
-
-}
-
-
-
-class changemanager {
-public:
-
-    void registerchange(float4 w);
-    std::map<float3, int, Float3Compare> changes;
-    float getchange(float3 w);
-    void load_model(const ogt_vox_model* model);
-};
-
-
-
-void changemanager::load_model(const ogt_vox_model* model)
-{
- 
-    uint32_t voxel_index = 0;
-    for (uint32_t z = 0; z < model->size_z; z++) {
-        for (uint32_t y = 0; y < model->size_y; y++) {
-            for (uint32_t x = 0; x < model->size_x; x++, voxel_index++) {
-                // if color index == 0, this voxel is empty, otherwise it is solid.
-                uint32_t color_index = model->voxel_data[voxel_index];
-                bool is_voxel_solid = (color_index != 0);
-                if (is_voxel_solid) {
-                    registerchange(make_float4(x, y, z, 2));
-
-                }
-                else {
-
-
-                }
-            }
-        }
-    }
-
-}
-
-
-void changemanager::registerchange(float4 w) {
-
-    changes[make_float3(w)] = w.w;
-
-}
-
-float changemanager::getchange(float3 w) {
-    if (changes.count(w) == 0) {
-        return -69;
-    }
-    else {
-        return changes[w];
-    }
-}
-
-
-
-
-
-//player class
-class Player{
-    public:
-        float3 moveto = { 0,0,0 };
-        float3 playerpos = { 0,0,2.0f };
-        float vz = 0;
-
-        void update(float delta);
-    };
-
-
-void Player::update(float delta){
-
-   playerpos.z += vz*delta;
-    }
 //chunk class
-class chunk {      
+class  {      
 public:          
     void Generate(Vertexmanager& verts);
   
@@ -766,16 +151,21 @@ public:
 
 
 //global wolrd class
-class world {      
+class  {      
 public:
   
     FastNoiseLite worldnoise;
     changemanager change;
+    Vertexmanager verts;
     world() {
 
         worldnoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+
+        verts.size = size;
+        verts.halfsize = size / 2;
+        verts.viewdist = viewdist;
     };
-    Vertexmanager verts;
+
     std::vector<float3> chunks;
 
     std::vector<float3> inputs;
@@ -820,7 +210,7 @@ void chunk::Generate(Vertexmanager& verts) {
 
                 float val = mainworld.getBlock(nx, ny, nz);
 
-                blocks[getindex(x, y, z)] = val;
+                blocks[getindex(x, y, z, size)] = val;
                 if (val > 0 && empty == true) {
 
                     empty = false;
@@ -862,31 +252,31 @@ void chunk::Generate(Vertexmanager& verts) {
                     int glass = 7;
                     int grass = -1;
                     bool isglass =false;
-                    if (blocks[getindex(x + 1, y + 1, z + 1)] == glass) {
+                    if (blocks[getindex(x + 1, y + 1, z + 1, size)] == glass) {
 
                         isglass = true;
                     }
 
                   
 
-                    if (blocks[getindex(x + 1, y + 1, z + 1)] <= 0 || isglass )
+                    if (blocks[getindex(x + 1, y + 1, z + 1, size)] <= 0 || isglass )
                     {
 
 
 
-                        if (blocks[getindex(x + 1, y + 1, z + 1)] == grass) {
+                        if (blocks[getindex(x + 1, y + 1, z + 1, size)] == grass) {
 
                             mat = -2;
                             verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(-0.5f, -0.5f, -0.49f) + pos, make_float3(0.5f, 0.5f, 0.5f) + pos, make_float3(0.5f, 0.5f, -0.49f) + pos, mat, position, 1);
                             verts.addplane(make_float3(0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, -0.49f) + pos, make_float3(-0.5f, 0.5f, 0.5f) + pos, make_float3(-0.5f, 0.5f, -0.49f) + pos, mat, position, 2);
                         }
                       
-                        if (blocks[getindex(x + 2, y + 1, z + 1)] > 0 )
+                        if (blocks[getindex(x + 2, y + 1, z + 1, size)] > 0 )
                         {
 
                            
 
-                            mat = blocks[getindex(x + 2, y + 1, z + 1)] - 1;
+                            mat = blocks[getindex(x + 2, y + 1, z + 1, size)] - 1;
 
                             if (isglass && mat + 1 == glass) {
 
@@ -903,9 +293,9 @@ void chunk::Generate(Vertexmanager& verts) {
 
 
                         }
-                        if (blocks[getindex(x, y + 1, z + 1)] > 0)
+                        if (blocks[getindex(x, y + 1, z + 1, size)] > 0)
                         {
-                            mat = blocks[getindex(x, y + 1, z + 1)] - 1;
+                            mat = blocks[getindex(x, y + 1, z + 1, size)] - 1;
                             if (isglass && mat + 1 == glass) {
 
 
@@ -921,10 +311,10 @@ void chunk::Generate(Vertexmanager& verts) {
 
 
                         }
-                        if (blocks[getindex(x + 1, y, z + 1)] > 0)
+                        if (blocks[getindex(x + 1, y, z + 1, size)] > 0)
                         {
 
-                            mat = blocks[getindex(x + 1, y, z + 1)] - 1;
+                            mat = blocks[getindex(x + 1, y, z + 1, size)] - 1;
                             if (isglass && mat + 1 == glass) {
 
 
@@ -943,9 +333,9 @@ void chunk::Generate(Vertexmanager& verts) {
 
 
                         }
-                        if (blocks[getindex(x + 1, y + 2, z + 1)] > 0)
+                        if (blocks[getindex(x + 1, y + 2, z + 1, size)] > 0)
                         {
-                            mat = blocks[getindex(x + 1, y + 2, z + 1)] - 1;
+                            mat = blocks[getindex(x + 1, y + 2, z + 1, size)] - 1;
                             if (isglass && mat + 1 == glass) {
 
 
@@ -961,10 +351,10 @@ void chunk::Generate(Vertexmanager& verts) {
                         }
 
 
-                        if (blocks[getindex(x + 1, y + 1, z)] > 0)
+                        if (blocks[getindex(x + 1, y + 1, z, size)] > 0)
                         {
 
-                            mat = blocks[getindex(x + 1, y + 1, z)] - 1;
+                            mat = blocks[getindex(x + 1, y + 1, z, size)] - 1;
                             if (isglass && mat + 1 == glass) {
 
 
@@ -977,10 +367,10 @@ void chunk::Generate(Vertexmanager& verts) {
 
 
                         }
-                        if (blocks[getindex(x + 1, y + 1, z + 2)] > 0)
+                        if (blocks[getindex(x + 1, y + 1, z + 2, size)] > 0)
                         {
 
-                            mat = blocks[getindex(x + 1, y + 1, z + 2)] - 1;
+                            mat = blocks[getindex(x + 1, y + 1, z + 2, size)] - 1;
                             if (isglass && mat + 1 == glass) {
 
 
@@ -1013,10 +403,15 @@ verts.addplane(make_float3(-0.5f, -0.5f, 0.5f) + pos, make_float3(0.5f, -0.5f, 0
 
 
 void world::updatechunk(float3 pos) {
-    lock.lock();
-    // inputs.push_back(getpos(pos - make_float3(16, 16, 16)));
-    inputs.insert(inputs.begin(), getpos(pos - make_float3(halfsize, halfsize, halfsize)));
-    lock.unlock();
+  //  lock.lock();
+  
+   inputs.insert(inputs.begin(), getpos(pos - make_float3(halfsize, halfsize, halfsize), size));
+  // lock.unlock();
+
+
+  //  addchunk(getpos(pos - make_float3(halfsize, halfsize, halfsize)));
+
+
     verts.removechunk(pos);
 
 
@@ -1031,9 +426,9 @@ void world::quechunk(float3 pos) {
 
     }
     else {
-        lock.lock();
+        verts.lock.lock();
         inputs.push_back(pos);
-        lock.unlock();
+        verts.lock.unlock();
     }
 }
 
@@ -1078,7 +473,7 @@ bool world::isblock(float3 start) {
 
 float world::getBlock(float nx, float ny, float nz) {
   
-    // float r3d = noise.GetNoise((float)nx*10, (float)ny * 10, (float)nz * 10);
+   
       //    int height = rand() % 10;
 
     float changes = change.getchange(make_float3(nx, ny, nz));
@@ -1127,8 +522,17 @@ float world::getBlock(float nx, float ny, float nz) {
 
         if (nz < r * 6 - 1) {
             if (nz < r * 6 - 10) {
-                return 5;
+            //    float r3d = worldnoise.GetNoise((float)nx * 10, (float)ny * 10, (float)nz * 10);
 
+            //    float r3d2 = worldnoise.GetNoise((float)nx * 2, (float)ny *2, (float)nz * 2);
+
+
+            //    if (r3d < 0.5 && r3d2 > 0.5) {
+
+             //       return 0;
+             //   }
+                return 5;
+                
             }
             return 6;
 
@@ -1231,15 +635,15 @@ void chunkthread() {
 
 
 
-            int size = mainworld.inputs.size();
+            int sizer = mainworld.inputs.size();
             float3 in;
             bool n = false;
-            if (size > 0) {
-                lock.lock();
+            if (sizer > 0) {
+             
                 n = true;
                 in = mainworld.inputs[0];
                 mainworld.inputs.erase(mainworld.inputs.begin());
-                lock.unlock();
+              
             }
 
 
@@ -1444,37 +848,37 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
                 }
 
                 mainworld.updatechunk(cast);
-                float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize));
+                float3 pos = getpos(cast - make_float3(halfsize, halfsize, halfsize), size);
                 float3 po = cast - make_float3(halfsize, halfsize, halfsize);
 
 
-                if (cnot(getpos(po + make_float3(0, 0, 2)), pos)) {
+                if (cnot(getpos(po + make_float3(0, 0, 2), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(0, 0, 2));
 
                 }
 
-                if (cnot(getpos(po + make_float3(0, 0, -2)), pos)) {
+                if (cnot(getpos(po + make_float3(0, 0, -2), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(0, 0, -2));
 
                 }
 
 
-                if (cnot(getpos(po + make_float3(0, 2, 0)), pos)) {
+                if (cnot(getpos(po + make_float3(0, 2, 0), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(0, 2, 0));
 
                 }
 
-                if (cnot(getpos(po + make_float3(0, -2, 0)), pos)) {
+                if (cnot(getpos(po + make_float3(0, -2, 0), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(0, -2, 0));
 
                 }
 
-                if (cnot(getpos(po + make_float3(2, 0, 0)), pos)) {
+                if (cnot(getpos(po + make_float3(2, 0, 0), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(2, 0, 0));
 
                 }
 
-                if (cnot(getpos(po + make_float3(-2, 0, 0)), pos)) {
+                if (cnot(getpos(po + make_float3(-2, 0, 0), size), pos)) {
                     mainworld.updatechunk(cast + make_float3(-2, 0, 0));
 
                 }
@@ -1839,7 +1243,7 @@ int main(int argc, char* argv[])
 
             std::thread threader(chunkthread);
 
-
+      
 
 
                 for (int x = 0; x < viewdist; x++) {
@@ -1856,8 +1260,9 @@ int main(int argc, char* argv[])
 
 
 
-
-                            mainworld.addchunk(pos);
+                         
+                                mainworld.addchunk(pos);
+                            
 
                         }
 
@@ -1973,7 +1378,7 @@ int main(int argc, char* argv[])
 
 
          
-            float3 now = getpos(mainworld.player.playerpos);
+            float3 now = getpos(mainworld.player.playerpos, size);
             int oldsize = 0;
             bool first = true;
             do
@@ -2060,23 +1465,24 @@ int main(int argc, char* argv[])
 
 
                 //update world
+              
+
+
+                float3 cposs = getpos(mainworld.player.playerpos, size);
+
                 canedit = false;
-
-
-                float3 cposs = getpos(mainworld.player.playerpos);
-
-
-
                 if (cposs.x != now.x || cposs.y != now.y || cposs.z != now.z)
                 {
                     mainworld.verts.cull(mainworld.player.playerpos,mainworld.chunks);
-                    lock.lock();
+
+                 
+                    mainworld.verts.lock.lock();
                     mainworld.inputs.clear();
-                    lock.unlock();
+                    mainworld.verts.lock.unlock();
                     now = cposs;
                     
 
-                        mainworld.quechunk(cposs);
+                  
                     
                     
                   
@@ -2093,9 +1499,9 @@ int main(int argc, char* argv[])
                                  
 
                                 
-                              
-
                                     mainworld.quechunk(pos);
+                                
+                                  
                                 
                             }
 
@@ -2108,12 +1514,16 @@ int main(int argc, char* argv[])
 
 
                 }
-              
-                mainworld.verts.updatenew();
 
              
+                mainworld.verts.updatenew();
+
+                canedit = true;
 
 
+                t1 = std::chrono::steady_clock::now();
+                state_update_time += t1 - t0;
+                t0 = t1;
 
 
 
@@ -2128,9 +1538,41 @@ int main(int argc, char* argv[])
                    first == true;
 
                    
+
                    oldsize = mainworld.verts.vertices.size();
+              //     float3 pos = getpos(mainworld.player.playerpos - make_float3(halfsize, halfsize, halfsize));
+
+             
 
 
+
+                  /*
+
+
+                   std::vector <float3> vertices2;
+                   std::vector <float4>uvs2;
+          
+
+                   int isze = mainworld.verts.vertices.size();
+                 
+               
+                   int e = 0;
+
+                   bool done = false;
+                   for (float3 value : mainworld.verts.index) {
+                   
+                       if (value.x == cposs.x && value.y == cposs.y) {
+
+                           vertices2.push_back(mainworld.verts.vertices[e]);
+                           uvs2.push_back(mainworld.verts.uvs[e]);
+                       }
+                       e++;
+                   }
+
+
+                   */
+                 
+                
                     vertices_size = sizeof(float3) * mainworld.verts.vertices.size();
                     d_vertices = 0;
                     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_vertices), vertices_size));
@@ -2143,7 +1585,7 @@ int main(int argc, char* argv[])
 
 
 
-                    uvs_size = sizeof(float4) * mainworld.verts.vertices.size();
+                    uvs_size = sizeof(float4) * mainworld.verts.uvs.size();
                      d_uvs = 0;
                     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_uvs), uvs_size));
                     CUDA_CHECK(cudaMemcpy(
@@ -2158,7 +1600,6 @@ int main(int argc, char* argv[])
 
 
 
-                    // Our build input is a simple list of non-indexed triangle vertices
                     triangle_input.triangleArray.numVertices = static_cast<uint32_t>(mainworld.verts.vertices.size());
                     triangle_input.triangleArray.vertexBuffers = &d_vertices;
 
@@ -2207,7 +1648,9 @@ int main(int argc, char* argv[])
                 }
 
 
-                canedit = true;
+                t1 = std::chrono::steady_clock::now();
+                render_time += t1 - t0;
+                t0 = t1;
 
 
                 //mouse
@@ -2227,9 +1670,6 @@ int main(int argc, char* argv[])
               
 
                 //clock
-                t1 = std::chrono::steady_clock::now();
-                state_update_time += t1 - t0;
-                t0 = t1;
                
 
          
@@ -2259,6 +1699,7 @@ int main(int argc, char* argv[])
 
 
                 //free
+                CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_param)));
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_gas_output_buffer)));
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_vertices)));
                 CUDA_CHECK(cudaFree(reinterpret_cast<void*>(d_uvs)));
@@ -2268,15 +1709,16 @@ int main(int argc, char* argv[])
 
 
                 //final time
+               
+
                 t1 = std::chrono::steady_clock::now();
-                render_time += t1 - t0;
-                t0 = t1;
+                display_time += t1 - t0;
+
+
 
                 displaySubframe(output_buffer, gl_display, window);
               
 
-                t1 = std::chrono::steady_clock::now();
-                display_time += t1 - t0;
                sutil::displayStats(state_update_time, render_time, display_time);
                glfwSwapBuffers(window);
            //    std::cout << mainworld.verts.vertices.size() << "\n";

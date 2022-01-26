@@ -358,7 +358,6 @@ extern "C" __global__ void __closesthit__ch()
 
 
 
-
   
 
 
